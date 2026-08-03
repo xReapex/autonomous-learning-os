@@ -162,9 +162,11 @@ function businessRules(doc) {
     }
   }
 
+  // Recommandation, jamais un blocage : c'est l'apprenant qui décide combien de
+  // matières il mène de front. On signale le compromis, on ne l'impose pas.
   const active = (doc.subjects ?? []).length;
-  if (active > 3) {
-    warnings.push(`${active} matières : au-delà de 3 actives, la révision se dilue (docs/LEARNING-SCIENCE.md). Garde les autres en backlog.`);
+  if (active > 5) {
+    warnings.push(`${active} matières : 3 à 5 est ce qui tient le mieux dans la durée — au-delà, la file de révision se remplit plus vite qu'elle ne se vide (docs/LEARNING-SCIENCE.md). Si c'est voulu, ignore cet avertissement.`);
   }
 }
 

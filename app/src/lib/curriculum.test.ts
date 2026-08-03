@@ -9,9 +9,18 @@ describe("curriculum livré", () => {
     expect(subjects.length).toBeGreaterThan(0);
   });
 
-  it("garde au plus trois matières actives", () => {
-    // Au-delà, la file de révision se dilue et le cursus devient décoratif.
-    expect(subjects.length).toBeLessThanOrEqual(3);
+  it("accepte autant de matières que l'apprenant en veut", () => {
+    // Il n'y a PAS de plafond. 3 à 5 est la recommandation (le validateur
+    // l'affiche en avertissement), mais un curriculum à douze matières doit se
+    // charger et s'afficher exactement comme un curriculum à une seule.
+    expect(subjects.length).toBeGreaterThan(0);
+    for (const subject of subjects) {
+      expect(subject.lessons.length).toBeGreaterThan(0);
+      // `lesson` est le raccourci vers la leçon courante : il doit exister pour
+      // chaque matière, sinon le dashboard rendrait du vide.
+      expect(subject.lesson).toBeDefined();
+      expect(subject.lesson.id).toBe(subject.lessons[0].id);
+    }
   });
 
   it("donne à chaque leçon une source gratuite, datée et argumentée", () => {

@@ -27,9 +27,15 @@ pour chaque format ni pour chaque personne.
 
 ## Les règles opérationnelles qui en découlent
 
-1. **Trois matières actives au maximum.** Multiplier les cursus crée une illusion
-   de progression et dilue la révision. Le reste va dans un backlog. Le validateur
-   du curriculum le signale au-delà de trois.
+1. **3 à 5 matières actives — recommandé, pas imposé.** Au-delà, la file de
+   révision se remplit plus vite qu'elle ne se vide, et on confond l'ouverture de
+   plusieurs cursus avec la progression dans un seul.
+
+   C'est un **compromis, pas une loi** : quelqu'un qui dispose de deux heures par
+   jour tient huit matières là où quelqu'un qui en a vingt minutes n'en tient pas
+   trois. Le validateur affiche un avertissement au-delà de cinq ; il ne bloque
+   rien, et l'app charge autant de matières que le curriculum en contient. Le
+   backlog est une option, pas une obligation.
 
 2. **Une carte atomique.** Une idée, une réponse récupérable, et si possible un
    exemple ou une condition de validité. Le recto est une **question**, jamais un

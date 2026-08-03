@@ -40,8 +40,7 @@
     "subjects": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 12,
-      "description": "Les matières. Trois actives maximum recommandées — au-delà, la révision se dilue.",
+      "description": "Les matières. Aucun plafond : c'est le choix de l'apprenant. 3 à 5 actives est ce qui tient le mieux dans la durée, au-delà la file de révision se dilue — le validateur le recommande, il ne l'impose pas.",
       "items": { "$ref": "#/$defs/subject" }
     },
     "cards": {

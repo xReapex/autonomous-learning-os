@@ -55,8 +55,9 @@ Ouverte. Ce que tu veux en sortir :
   des modèles*, *utiliser des LLM en produit*, ou *comprendre les fondations
   mathématiques*. Reformule et fais confirmer.
 - **Mono-sujet ou cursus ?** Un sujet unique donne un curriculum profond. Plusieurs
-  matières donnent un cursus large — dans ce cas, **maximum 3 matières actives**
-  (au-delà, la révision se dilue, cf. `docs/LEARNING-SCIENCE.md`).
+  matières donnent un cursus large. **3 à 5 matières actives est ce qui tient le
+  mieux dans la durée** (cf. `docs/LEARNING-SCIENCE.md`) — dis-le, puis
+  **construis ce qu'il demande**. Il n'y a pas de plafond : c'est son temps.
 - **Le format actuel.** Demande explicitement : *« Tu apprends comment aujourd'hui ?
   Vidéos, livres, cours en ligne, projets ? Qu'est-ce qui n'a pas marché ? »* Ça
   oriente la pondération vidéo / lecture / pratique de la recherche.
@@ -257,5 +258,7 @@ Ne fais pas un rapport de 40 lignes. Il veut apprendre, pas lire ton compte rend
   c'est sur mesure.
 - **Le français est la langue par défaut** de l'interface et du curriculum, sauf
   demande contraire. Les titres de sources restent dans leur langue d'origine.
-- **Trois matières actives maximum.** Si l'utilisateur en veut huit, explique
-  pourquoi c'est contre-productif, propose un backlog, et laisse-le trancher.
+- **Le nombre de matières est SA décision.** Tu recommandes 3 à 5 actives, une
+  fois, avec la raison. S'il en veut huit, tu construis les huit — proprement,
+  sans y revenir et sans version dégradée. Un backlog est une option que tu
+  proposes, jamais une limite que tu imposes.

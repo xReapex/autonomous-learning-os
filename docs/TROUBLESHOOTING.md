@@ -68,10 +68,15 @@ Deux modules portent le même identifiant, souvent après une fusion de branches
 recherche. Les ids doivent être uniques dans tout le document — ils servent de clé
 de progression.
 
-### L'avertissement « au-delà de 3 matières »
+### L'avertissement « au-delà de 5 matières »
 
-Non bloquant, mais lis-le : au-delà de trois matières actives, la file de révision
-se dilue et le cursus devient décoratif. Mets les autres en backlog.
+**Il n'y a aucune limite** — ni dans le schéma, ni dans l'app, ni dans les tests.
+L'avertissement dit juste que 3 à 5 matières actives est ce qui tient le mieux
+quand le temps quotidien est limité, parce que la file de révision se remplit
+plus vite qu'elle ne se vide.
+
+Si c'est un choix assumé, ignore-le : le validateur sort en succès, et l'app
+charge autant de matières que le curriculum en contient.
 
 ---
 
