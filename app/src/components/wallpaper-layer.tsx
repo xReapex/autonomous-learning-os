@@ -1,10 +1,10 @@
 "use client";
 
-// Le fond du bureau, peint derrière toutes les fenêtres.
+// Le fond de l'espace de travail.
 //
-// Trois couches : la couleur pleine, le motif ou l'image à l'opacité choisie,
-// puis le grain papier — repris tel quel du bureau BizOS pour que l'ensemble
-// reste cohérent quel que soit le fond.
+// En V9 il occupe tout l'écran et reste visible autour des panneaux : aucune
+// atténuation par défaut, aucun grain. Les cartes blanches opaques assurent
+// seules la lisibilité du contenu.
 
 import { useWallpaper } from "./wallpaper-context";
 import { wallpaperStyles } from "@/lib/wallpapers";
@@ -17,7 +17,6 @@ export function WallpaperLayer() {
     <div className="bx-wallpaper" aria-hidden="true">
       <div style={base} />
       {overlay ? <div style={overlay} /> : null}
-      <div className="bx-wallpaper-grain" />
     </div>
   );
 }

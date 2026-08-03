@@ -1,13 +1,17 @@
 import type { ReactNode } from "react";
 
 /**
- * La fenêtre du bureau : bordure 2 px encre, ombre dure violette, coins nets,
- * barre de titre en mono majuscule avec le carré violet.
+ * La carte V9 : fond blanc, trait 1 px, ombre dure 5 px en bas à droite, coins
+ * carrés. L'en-tête est un carré noir de 9 px suivi du titre en Inria Serif —
+ * **sans aucun trait en dessous**, c'est le modèle `File` du brief V9.
  *
- * Tout le contenu de l'app passe par ce composant — c'est ce qui garantit que
- * rien ne dérive vers un panneau arrondi ou une ombre floue.
+ * Tout le contenu de l'app passe par ce composant : c'est ce qui garantit
+ * qu'une section ajoutée plus tard n'importe pas son propre langage visuel.
+ *
+ * Une section sans action à droite garde exactement la même hauteur et le même
+ * alignement de titre qu'une section avec actions.
  */
-export function Win({
+export function Card({
   title,
   right,
   children,
@@ -19,19 +23,25 @@ export function Win({
   className?: string;
 }) {
   return (
-    <section className={className ? `bx-win ${className}` : "bx-win"}>
+    <section className={className ? `bx-card ${className}` : "bx-card"}>
       {title ? (
-        <header className="bx-win-title">
-          <span className="bx-glyph" aria-hidden="true" />
-          {title}
-          {right ? <span className="bx-title-right">{right}</span> : null}
+        <header className="bx-card-head">
+          <h2>
+            <span className="bx-square" aria-hidden="true" />
+            <span>{title}</span>
+          </h2>
+          {right ? <span className="bx-head-right">{right}</span> : null}
         </header>
       ) : null}
-      <div className="bx-win-body">{children}</div>
+      {children}
     </section>
   );
 }
 
-export function Badge({ tone = "neutral", children }: { tone?: "neutral" | "live" | "warn" | "danger" | "done"; children: ReactNode }) {
-  return <span className="bx-badge" data-tone={tone}>{children}</span>;
+/**
+ * Un état, écrit en toutes lettres. `on` ne fait qu'inverser le contraste —
+ * l'information reste dans le texte, jamais dans la couleur seule.
+ */
+export function Status({ on = false, children }: { on?: boolean; children: ReactNode }) {
+  return <span className="bx-status" data-on={on}>{children}</span>;
 }

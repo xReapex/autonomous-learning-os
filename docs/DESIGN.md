@@ -1,24 +1,30 @@
 # Le design — BizOS × Learning
 
-L'app est rendue comme un **bureau** : canvas crème, grain papier, fenêtres à
-bordure épaisse qui projettent une ombre dure violette, tout en monospace.
+L'app suit l'**UX BizOS V9**, la version en production sur
+[bizos.cc](https://bizos.cc) : un wallpaper occupe tout l'écran, des panneaux
+blancs stricts flottent dessus avec une ombre dure, et tout est écrit en
+**Inria Serif**.
 
-C'est le langage visuel de [BizOS](https://bizos.cc), repris ici pour que
-l'espace d'apprentissage se sente comme une pièce du même système. Le wordmark
-`BizOS × Learning` en haut à gauche dit exactement ça.
+La référence est le brief V9 du dépôt `bizos-saas` (branche `main`,
+`docs/design/BRIEF-DASHBOARD-BIZOS-V9.md`). L'ancien « Desktop OS » crème et
+violet, tout en monospace, appartient au passé — si vous trouvez encore un
+`#8b6df0` quelque part, c'est un reliquat à supprimer.
 
 ---
 
-## Trois règles qui ne se négocient pas
+## Les règles qui ne se négocient pas
 
-1. **`--radius: 0`.** Rien n'arrondit. Jamais.
-2. **Aucune ombre floue.** `6px 6px 0 #8b6df0` et rien d'autre. Pas de `blur`, pas
-   de dégradé sur une surface.
-3. **Une seule teinte d'accent.** Le violet signifie *actif*. L'ochre signifie
-   *attention*, la brique *destructif*. Pas de quatrième couleur.
-
-Enfreindre l'une des trois casse le bureau : la surface devient une carte
-Material, et tout le reste suit.
+1. **Une seule grammaire visuelle : noir, blanc, gris.** Aucune teinte d'accent.
+   Le statut ne repose jamais sur la couleur seule — il s'écrit en toutes lettres.
+2. **Inria Serif est la voix du produit.** La monospace se limite aux durées,
+   compteurs et identifiants ; elle n'est jamais la voix générale.
+3. **L'interface reste carrée.** `--radius: 0`, aucune pilule, aucune lueur,
+   aucun dégradé.
+4. **L'ombre appartient aux fenêtres, pas aux contrôles.** `5px 5px 0`, dirigée
+   en bas à droite, sans flou. **Les boutons sont plats.**
+5. **Au survol, les couleurs s'inversent — rien ne bouge.** Pas de `translate`,
+   pas d'ombre ajoutée.
+6. **Le titre de section n'a jamais de trait en dessous.**
 
 ---
 
@@ -26,146 +32,155 @@ Material, et tout le reste suit.
 
 | Token | Valeur | Usage |
 |---|---|---|
-| `--bg` | `#ece5d6` | Le bureau, crème mat |
-| `--surface` | `#f4eee0` | Fenêtres, menubar, rail |
-| `--surface-2` | `#e8e0cf` | Ligne active dans une liste |
-| `--ink` | `#1f1a2e` | Encre navy-noir — **toutes** les bordures, 2 px |
-| `--ink-soft` | `#5b5448` | Texte secondaire, taupe chaud |
-| `--hairline` | `#ddd3bf` | Séparateur fin, survol |
-| `--purple` | `#8b6df0` | Accent : actif, CTA, grands chiffres, ombres |
-| `--purple-deep` | `#6e52d4` | Texte violet : liens, libellés, titres de fenêtre |
-| `--purple-hover` | `#7959e0` | Survol d'un bouton violet |
-| `--ochre` | `#c8862b` | Attention, en pause |
-| `--brick` | `#c4452e` | Destructif, STOP |
-| `--teal` | `#2f7d68` | Terminé |
+| `--ink` | `#111111` | Encre, traits, remplissages actifs |
+| `--paper` | `#ffffff` | Fond des cartes |
+| `--canvas` | `#e8e8e6` | Le gris de l'espace, sous le wallpaper |
+| `--grey-600` | `#6b6b6b` | Métadonnées, texte secondaire |
+| `--grey-400` | `#9a9a9a` | Placeholders |
+| `--grey-200` | `#d9d9d9` | Traits fins, états désactivés |
+| `--grey-100` | `#efefee` | Fonds de champ, séparateurs de lignes |
 
-Sur un fond sombre, `data-surface="dark"` inverse l'encre en crème et fonce les
-surfaces. **Le violet ne bouge pas** — c'est ce qui garde l'identité d'un thème à
-l'autre.
+C'est tout. Il n'y a pas de token d'accent, et il ne faut pas en ajouter.
 
-Le basculement est automatique : `isDarkWallpaper()` calcule la luminance perçue
-du fond choisi. Sans ça, l'encre navy sur du navy devient illisible.
+**Sur un fond sombre**, `data-surface="dark"` inverse **uniquement la chrome
+posée directement sur le wallpaper** — wordmark, sous-titre, barre basse. Les
+cartes ne changent jamais : blanches, texte noir, trait noir. Le fond apporte le
+monde, les panneaux restent stricts.
 
 ---
 
 ## La typographie
 
-Tout est monospace. Il n'y a pas de couple serif/sans.
-
 ```css
---mono: ui-monospace, "SF Mono", "Courier Prime", "Courier New", Courier, monospace;
+--serif: var(--font-inria), Georgia, "Times New Roman", serif;   /* la voix */
+--sans:  var(--font-lexend), "Helvetica Neue", Arial, sans-serif; /* microcopies */
+--mono:  ui-monospace, "SF Mono", Menlo, "Courier New", monospace; /* chiffres */
 ```
 
-Pile système délibérée : pas de `next/font`, donc pas d'appel réseau au build, et
-l'app se construit hors ligne.
+Les deux polices viennent de `next/font/google` : elles sont téléchargées au
+build puis **auto-hébergées**, donc aucun appel à Google au runtime. Georgia est
+un repli très proche si le build se fait hors ligne.
 
 | Rôle | Traitement |
 |---|---|
-| Corps, tableaux, horodatages | Mono, poids normal |
-| Titres de fenêtre, libellés, boutons | **Gras + MAJUSCULES + `letter-spacing: 1–2px`** |
-| Grands chiffres (KPI, chrono) | Mono gras, grande taille, **violet** |
-| Sur-titres (`.bx-overline`) | 10 px, gras, 2 px de tracking, violet foncé |
+| Titre de section | Inria Serif, `1.3rem`, gras, casse normale, tracking normal |
+| Titre de page | Inria Serif, `1.65rem`, gras |
+| Corps | Inria Serif, `0.85–0.9rem` |
+| Libellés, métadonnées, boutons | Lexend, `0.6–0.68rem`, majuscules, `letter-spacing` `0.12em` |
+| Chrono, durées, index | Mono |
 
-`font-feature-settings: "tnum"` partout : les chiffres restent alignés d'une ligne
-à l'autre, ce qui compte sur un chrono et une file de révision.
+Pas de capitales espacées sur toutes les microcopies : uniquement sur les
+libellés et les actions.
 
 ---
 
-## La fenêtre
-
-Toute surface de contenu est une fenêtre. Le composant `<Win>`
-(`src/components/window.tsx`) est le seul chemin — c'est ce qui empêche la dérive
-vers un panneau arrondi.
+## La carte
 
 ```
 ┌─────────────────────────────────────┐╲
-│ ■ TITRE EN MAJUSCULES      contexte │ ╲  ombre dure violette
-├─────────────────────────────────────┤  │  6px 6px 0, aucun flou
-│                                     │  │
-│  contenu                            │  │
+│ ■ Titre de section         contexte │ ╲  ombre dure 5px 5px 0
+│                                     │  │  dirigée, sans flou
+│   contenu                           │  │
 │                                     │  │
 └─────────────────────────────────────┘  │
  ╲_________________________________________╲
 ```
 
-- Surface `#f4eee0`, bordure 2 px `#1f1a2e`, coins nets.
-- Barre de titre 30 px : carré violet à bordure navy, titre mono majuscule,
-  contexte à droite en taupe, règle 2 px en dessous.
-- Ombre `6px 6px 0 var(--purple)` — `3px 3px` pour les éléments compacts.
+- Fond **blanc**, trait **1 px** noir, coins carrés, `padding: 12px 14px`.
+- L'en-tête est **un carré noir de 9 px** suivi du titre en serif. **Aucun trait,
+  aucun bord, aucun séparateur en dessous.**
+- Une section sans action à droite garde exactement la même hauteur et le même
+  alignement qu'une section avec actions.
+- Aucun bandeau noir décoratif, aucune carte dans une carte sans raison
+  fonctionnelle.
+
+Le composant `<Card>` (`src/components/window.tsx`) est le seul chemin — c'est ce
+qui empêche une section ajoutée plus tard d'importer son propre langage visuel.
 
 ---
 
-## Le bureau et ses fonds
+## La composition
 
-Trois couches empilées, `WallpaperLayer` :
+```
+              BizOS ᴸᴱᴬᴿᴺᴵᴺᴳ          ← wordmark centré, hors des cartes
+                 SUJET                ← sous-titre
 
-1. La couleur pleine du fond.
-2. Le motif ou l'image, à l'opacité choisie.
-3. Le **grain** — le `feTurbulence fractalNoise` de BizOS, à 0,06 d'opacité,
-   repris verbatim pour que la texture soit exactement la même.
+┌──────────────────┐ ┌──────────┐     ← 3 colonnes, gouttière 11 px
+│                  │ │          │
+│   colonne large  │ │  cartes  │
+│   (span 2)       │ │          │
+└──────────────────┘ └──────────┘
 
-Le contenu passe au-dessus en `z-index: 1`.
+   AUJOURD'HUI  COURS  EXERCICES …    ← barre basse persistante
+```
 
-### Les douze fonds livrés
-
-Tous **procéduraux** : du SVG en data-URI écrit à la main, dans
-`src/lib/wallpapers.ts`. Quelques kilo-octets, aucun asset binaire.
-
-C'est un choix qui a une raison : ce dépôt est public. Redistribuer des images —
-même générées — de personnes réelles ou d'œuvres protégées poserait un problème
-de droits à chaque personne qui clone.
-
-| Groupe | Fonds | Pour |
-|---|---|---|
-| Bureau | Bureau, Papier, Liège | Le défaut, et les sujets qui s'écrivent |
-| Grilles | Grille, Blueprint, Points | Ingénierie, systèmes |
-| Matières | Synapse, Registre, Orbite, Relief | Cognition, finance, astro, vivant |
-| Nuit | Minuit, Ciel | Sessions tardives |
-
-Chaque fond porte une `suggestedDim` : l'opacité à laquelle il reste **derrière**
-le contenu. Elle s'applique au changement de fond ; l'utilisateur reste libre de
-l'ajuster ensuite.
-
-### Les fonds de l'utilisateur
-
-Déposés dans `app/public/wallpapers/`, listés par `/api/wallpapers`, visibles au
-rechargement. Le dossier est git-ignoré : les images restent chez leur
-propriétaire et ne partent pas dans un fork.
+- Le wordmark `BizOS` est centré au-dessus de l'espace de travail, **jamais
+  répété dans un panneau**.
+- Trois colonnes, gouttière de **11 px**, largeur maximale 1320 px.
+- La barre basse est fixe ; le workspace réserve la place en dessous
+  (`padding-bottom: 62px`) pour que le contenu ne se perde pas derrière elle.
+- En dessous de 1180 px on passe à deux colonnes, puis à une pile de cartes sous
+  780 px.
 
 ---
 
 ## Les commandes
 
-**Boutons** (`.bx-btn`) — rectangulaires, bordure 2 px, mono majuscule, ombre
-dure. Le retour tactile est la micro-interaction principale :
+**Bouton** — fond noir, texte blanc, trait noir, carré, **sans ombre**. Au survol
+et au focus, les couleurs s'inversent ; le bouton ne se déplace pas.
+`.bx-btn-ghost` est son négatif. Un `aria-pressed` rend l'état sélectionné.
 
-| État | Transform | Ombre |
-|---|---|---|
-| Repos | — | `3px 3px` |
-| Survol | `translate(-1px, -1px)` | `4px 4px` |
-| Pressé | `translate(2px, 2px)` | `1px 1px` |
-| Sélectionné (`aria-pressed`) | pressé, en permanence | `1px 1px` + fond violet |
+**Action textuelle** — Inria Serif `0.78rem`, souligné. Le survol change
+l'opacité, jamais la position.
 
-Variantes : `default` (crème), `bx-btn-accent` (violet plein), `bx-btn-danger`
-(brique), `bx-btn-ghost` (sans bordure).
+**Ligne de ressource** (`.bx-row`) — icône, titre, métadonnée, `Ouvrir →` révélé
+au survol **et au focus**. Toute la ligne est cliquable ; au survol elle passe en
+noir, texte en blanc. Aucun mouvement vertical.
 
-**Focus** — double `box-shadow` violet, décalé de 2 px du bord. Un utilisateur
-clavier doit le voir sans le chercher.
+**Tâche / étape** (`.bx-task`) — noire à texte blanc quand elle est active,
+s'inverse au survol. Une étape inactive est grise, et son état est écrit.
 
-**Mouvement** — 100 à 150 ms, mécanique. Coupé entièrement sous
-`prefers-reduced-motion`.
+**Contrôle segmenté** (`.bx-segmented`) — actif : noir sur blanc inversé ;
+inactif : gris à trait noir.
+
+**Focus** — contour de 2 px, décalé de 2 px, sans déplacement. Le focus clavier
+révèle exactement les mêmes actions que le survol.
+
+---
+
+## Le wallpaper
+
+Il occupe tout l'écran et reste visible autour des panneaux. **Il n'est pas
+atténué par défaut** : ce sont les cartes qui sont opaques.
+
+Les douze fonds livrés sont **procéduraux** — du SVG en data-URI écrit à la main
+dans `src/lib/wallpapers.ts`. Ce dépôt étant public, redistribuer des images de
+personnes réelles ou d'œuvres protégées poserait un problème de droits à chaque
+personne qui clone. Ils sont tous monochromes ou très désaturés : le fond apporte
+l'ambiance, jamais un accent coloré.
+
+| Groupe | Fonds |
+|---|---|
+| Atelier | Atelier, Papier, Toile |
+| Grilles | Grille, Blueprint, Points |
+| Matières | Synapse, Registre, Orbite, Relief |
+| Nuit | Minuit, Ciel |
+
+Les images de l'utilisateur vont dans `app/public/wallpapers/` (git-ignoré) et
+apparaissent dans la galerie au rechargement.
 
 ---
 
 ## Ce qu'on ne fait pas
 
-- Pas d'ombre floue, pas de coin arrondi, pas de dégradé sur une surface.
-- Pas de serif, pas de sans — le bureau est mono uniquement.
-- Pas de nouvelle teinte d'accent. On étend avec violet / ochre / brique.
-- Pas d'emoji couleur dans l'interface. Les icônes de matières sont des glyphes
-  monospace : `↗ ◌ ◐ ✦ ⌁ △ ≋ ✣ ◇ ◎`.
-- Pas de grands aplats violets. Le violet est précieux : il marque *l'action
-  principale en vue*, et une seule à la fois.
+- Pas de teinte d'accent, pas de gradient, pas de lueur, pas de flou d'ombre.
+- Pas de coin arrondi, pas de pilule.
+- Pas d'ombre sur un bouton interne.
+- Pas de mouvement au survol.
+- Pas d'emoji couleur : les icônes de matières sont des glyphes
+  (`↗ ◌ ◐ ✦ ⌁ △ ≋ ✣ ◇ ◎`).
+- Pas de trait sous un titre de section.
+- Pas de monospace comme voix générale.
 
 ---
 
@@ -175,11 +190,22 @@ Sans toucher au CSS :
 
 | Quoi | Où |
 |---|---|
-| Sujet affiché sous le wordmark | `NEXT_PUBLIC_LEARNING_SUBJECT` |
+| Sujet sous le wordmark | `NEXT_PUBLIC_LEARNING_SUBJECT` |
 | Fond par défaut | `NEXT_PUBLIC_DEFAULT_WALLPAPER` |
 | Durée de session par défaut | `NEXT_PUBLIC_DEFAULT_SESSION_MINUTES` |
 | Icônes de matières | `icon` dans `curriculum.json` |
 
-En touchant au CSS : tout part des variables en tête de
-`src/app/globals.css`. Changer `--purple` retourne l'identité complète — ombres,
-accents, focus, chiffres — en une ligne.
+En touchant au CSS : tout part des variables en tête de `src/app/globals.css`.
+
+---
+
+## Checklist avant de livrer un composant
+
+- [ ] Le titre suit le modèle : carré noir de 9 px, serif, **pas de trait dessous**.
+- [ ] La palette reste monochrome.
+- [ ] Les coins sont carrés, le trait principal fait 1 px.
+- [ ] L'ombre de carte est `5px 5px 0`, aucun bouton interne n'a d'ombre.
+- [ ] Rien ne bouge au survol.
+- [ ] Le focus clavier révèle les mêmes actions que le survol.
+- [ ] Aucun état ne repose sur la seule couleur.
+- [ ] Vérifié à 1440 × 900, 1280 × 800 et en pile mobile.

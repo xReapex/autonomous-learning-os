@@ -3,9 +3,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { subjectById } from "@/lib/curriculum";
-import { formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { useStudy } from "./study-context";
-import { Win } from "./window";
+import { Card } from "./window";
 
 type CoachResponse = {
   status?: "completed" | "manual" | "failed";
@@ -77,118 +77,114 @@ export function ExercisesPage() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Le presse-papiers peut être refusé (contexte non sécurisé) : le prompt
-      // reste affiché et sélectionnable, rien n'est perdu.
+      // Presse-papiers refusé (contexte non sécurisé) : le prompt reste affiché
+      // et sélectionnable, rien n'est perdu.
     }
   }
 
   return (
     <>
-      <div className="bx-page-head">
-        <div>
-          <p className="bx-overline">Espace exercices</p>
-          <h1>Prouve que tu as compris.</h1>
-        </div>
-        <p className="bx-page-intro">
-          L&apos;exercice suit la leçon du jour. La référence n&apos;apparaît qu&apos;après ton premier effort.
-        </p>
+      <div className="bx-col bx-col-wide">
+        <Card title="Question du jour" right={subject.title}>
+          <div className="bx-page-head">
+            <p className="bx-overline">Espace exercices</p>
+            <h1>Prouve que tu as compris.</h1>
+          </div>
+
+          <p style={{ fontSize: "1rem", lineHeight: 1.45, fontWeight: 700 }}>{lesson.prompt}</p>
+
+          <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+            <div className="bx-field">
+              <label className="bx-label" htmlFor="answer">Ta réponse, sans rouvrir le cours</label>
+              <textarea
+                id="answer"
+                className="bx-textarea"
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+                placeholder="Explique le mécanisme, donne un exemple qui vient de ton terrain, puis cherche une limite…"
+              />
+            </div>
+
+            <div className="bx-between">
+              <button type="submit" className="bx-btn" disabled={status === "sending" || wordCount < 20}>
+                {status === "sending" ? "Correction en cours…" : "Faire corriger"}
+              </button>
+              <span className="bx-muted">
+                {wordCount} mot{wordCount > 1 ? "s" : ""}
+                {wordCount < 20 ? ` · ${20 - wordCount} avant de pouvoir envoyer` : ""}
+              </span>
+            </div>
+          </form>
+
+          {result?.status === "completed" ? <div className="bx-feedback">{result.feedback}</div> : null}
+
+          {result?.status === "manual" ? (
+            <>
+              <div className="bx-note">
+                <strong>Aucune clé API n&apos;est configurée — c&apos;est voulu</strong>
+                {result.hint}
+              </div>
+              <pre className="bx-code">{result.prompt}</pre>
+              <div className="bx-inline">
+                <button type="button" className="bx-btn" onClick={copyPrompt}>
+                  {copied ? "Copié" : "Copier le prompt"}
+                </button>
+                <span className="bx-muted">Ta réponse est déjà dans ton historique.</span>
+              </div>
+            </>
+          ) : null}
+
+          {result?.status === "failed" ? <div className="bx-feedback">{result.error}</div> : null}
+        </Card>
       </div>
 
-      <div className="bx-split">
-        <div className="bx-stack">
-          <Win title={`Question du jour · ${subject.title}`}>
-            <h2 style={{ fontSize: 17, lineHeight: 1.4 }}>{lesson.prompt}</h2>
+      <div className="bx-col">
+        <Card title="Le protocole">
+          <div className="bx-task bx-task-idle">
+            <span className="bx-task-meta">01</span>
+            <span className="bx-task-title">Récupère — écris ce qui revient sans aide.</span>
+          </div>
+          <div className="bx-task bx-task-idle">
+            <span className="bx-task-meta">02</span>
+            <span className="bx-task-title">Transfère — applique l&apos;idée à une situation nouvelle.</span>
+          </div>
+          <div className="bx-task bx-task-idle">
+            <span className="bx-task-meta">03</span>
+            <span className="bx-task-title">Répare — compare, corrige, puis réexplique.</span>
+          </div>
+        </Card>
 
-            <form onSubmit={submit} className="bx-stack">
-              <div className="bx-field">
-                <label className="bx-label" htmlFor="answer">Ta réponse, sans rouvrir le cours</label>
-                <textarea
-                  id="answer"
-                  className="bx-textarea"
-                  value={answer}
-                  onChange={(event) => setAnswer(event.target.value)}
-                  placeholder="Explique le mécanisme, donne un exemple qui vient de ton terrain, puis cherche une limite…"
-                />
-              </div>
+        <Card title="Points de contrôle">
+          {showReference ? (
+            <ul className="bx-list">
+              {lesson.keyTakeaways.map((item) => <li key={item}><span>{item}</span></li>)}
+            </ul>
+          ) : (
+            <p className="bx-muted">
+              Fais d&apos;abord un effort réel. Même une mauvaise première réponse produit un meilleur signal
+              d&apos;apprentissage qu&apos;une relecture.
+            </p>
+          )}
+          <button type="button" className="bx-link" onClick={() => setShowReference((current) => !current)}>
+            {showReference ? "Masquer la référence" : "Comparer avec les idées clés →"}
+          </button>
+        </Card>
 
-              <div className="bx-row-between">
-                <button type="submit" className="bx-btn bx-btn-accent" disabled={status === "sending" || wordCount < 20}>
-                  {status === "sending" ? "Correction en cours…" : "Faire corriger"}
-                </button>
-                <span className="bx-muted">
-                  {wordCount} mot{wordCount > 1 ? "s" : ""}
-                  {wordCount < 20 ? ` · ${20 - wordCount} avant de pouvoir envoyer` : ""}
+        {history.length > 0 ? (
+          <Card title="Historique" right={`${history.length} réponses`}>
+            {history.slice(0, 6).map((entry) => (
+              <div key={entry.id} className="bx-row">
+                <span className="bx-row-icon" aria-hidden="true">✎</span>
+                <span className="bx-row-body">
+                  <span className="bx-row-title">{entry.answer.split(/\s+/).length} mots</span>
+                  <span className="bx-row-meta">
+                    {formatDate(entry.createdAt)} · {entry.feedback ? "corrigé" : "en attente"}
+                  </span>
                 </span>
               </div>
-            </form>
-
-            {result?.status === "completed" ? (
-              <div className="bx-feedback">{result.feedback}</div>
-            ) : null}
-
-            {result?.status === "manual" ? (
-              <div className="bx-stack">
-                <div className="bx-proof">
-                  <strong>Aucune clé API n&apos;est configurée — c&apos;est voulu.</strong>
-                  <p>{result.hint}</p>
-                </div>
-                <pre className="bx-code">{result.prompt}</pre>
-                <div className="bx-row">
-                  <button type="button" className="bx-btn bx-btn-accent" onClick={copyPrompt}>
-                    {copied ? "Copié" : "Copier le prompt"}
-                  </button>
-                  <span className="bx-muted">Ta réponse est déjà enregistrée dans ton historique.</span>
-                </div>
-              </div>
-            ) : null}
-
-            {result?.status === "failed" ? (
-              <div className="bx-feedback" style={{ borderLeftColor: "var(--brick)" }}>{result.error}</div>
-            ) : null}
-          </Win>
-
-          {history.length > 0 ? (
-            <Win title="Historique" right={`${history.length} réponses`}>
-              <ol className="bx-sequence">
-                {history.slice(0, 6).map((entry) => (
-                  <li key={entry.id}>
-                    <time>{formatDateTime(entry.createdAt).split(" ")[0]}</time>
-                    <div>
-                      <strong>{entry.answer.split(/\s+/).length} mots</strong>
-                      <p>{entry.feedback ? "Corrigé" : "En attente de correction"}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </Win>
-          ) : null}
-        </div>
-
-        <div className="bx-stack">
-          <Win title="Le protocole">
-            <ol className="bx-ordered">
-              <li><div><strong>Récupère</strong><span>Écris ce qui revient sans aide.</span></div></li>
-              <li><div><strong>Transfère</strong><span>Applique l&apos;idée à une situation nouvelle.</span></div></li>
-              <li><div><strong>Répare</strong><span>Compare, corrige, puis réexplique.</span></div></li>
-            </ol>
-          </Win>
-
-          <Win title="Points de contrôle">
-            {showReference ? (
-              <ul className="bx-list">
-                {lesson.keyTakeaways.map((item) => <li key={item}><span>{item}</span></li>)}
-              </ul>
-            ) : (
-              <p className="bx-muted">
-                Fais d&apos;abord un effort réel. Même une mauvaise première réponse produit un meilleur signal
-                d&apos;apprentissage qu&apos;une relecture.
-              </p>
-            )}
-            <button type="button" className="bx-link-action" onClick={() => setShowReference((current) => !current)}>
-              {showReference ? "Masquer la référence" : "Comparer avec les idées clés"}
-            </button>
-          </Win>
-        </div>
+            ))}
+          </Card>
+        ) : null}
       </div>
     </>
   );

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { ReviewCard } from "@/lib/curriculum";
 import { subjects } from "@/lib/curriculum";
 import { gradeLabels, previewInterval, type CardState, type ReviewGrade } from "@/lib/scheduler";
-import { Win } from "./window";
+import { Card } from "./window";
 
 type DueCard = ReviewCard & { state: CardState };
 type Queue = { due: DueCard[]; total: number; upcoming: { date: string; count: number }[] };
@@ -45,7 +45,11 @@ export function ReviewsPage() {
   }
 
   if (!queue) {
-    return <div className="bx-loader" role="status">Chargement de ta file…</div>;
+    return (
+      <div className="bx-col bx-col-full">
+        <div className="bx-loader" role="status">Chargement de ta file…</div>
+      </div>
+    );
   }
 
   const card = queue.due[index];
@@ -54,31 +58,25 @@ export function ReviewsPage() {
 
   return (
     <>
-      <div className="bx-page-head">
-        <div>
-          <p className="bx-overline">Espace révisions</p>
-          <h1>Retrouver, pas reconnaître.</h1>
-        </div>
-        <p className="bx-page-intro">
-          Chaque carte revient au moment où l&apos;oubli devient probable. Ta note règle le prochain passage.
-        </p>
-      </div>
+      <div className="bx-col bx-col-wide">
+        <Card title="File du jour" right={lastInterval ? `précédente ${lastInterval}` : `${queue.due.length} dues`}>
+          <div className="bx-page-head">
+            <p className="bx-overline">Espace révisions</p>
+            <h1>Retrouver, pas reconnaître.</h1>
+          </div>
 
-      <div className="bx-split">
-        <Win
-          title="File du jour"
-          right={lastInterval ? `Carte précédente ${lastInterval}` : `${queue.due.length} dues`}
-        >
           {done ? (
-            <div className="bx-stack">
-              <p className="bx-big">{reviewed}</p>
-              <h2>{reviewed > 0 ? "cartes révisées" : "rien à réviser"}</h2>
+            <>
+              <div className="bx-metric">
+                <span className="bx-metric-value">{reviewed}</span>
+                <span className="bx-metric-label">{reviewed > 0 ? "cartes révisées" : "rien à réviser"}</span>
+              </div>
               <p className="bx-muted">
                 {reviewed > 0
                   ? "File terminée. Les prochaines reviendront à leur date d'échéance."
                   : "Aucune carte due aujourd'hui. Reviens demain, ou avance dans le cours pour en créer."}
               </p>
-            </div>
+            </>
           ) : (
             <>
               <button type="button" className="bx-flashcard" onClick={() => setShowBack((current) => !current)}>
@@ -92,7 +90,7 @@ export function ReviewsPage() {
               </button>
 
               {showBack ? (
-                <div className="bx-grade-grid">
+                <div className="bx-grades">
                   {GRADES.map((value) => (
                     <button key={value} type="button" className="bx-btn" onClick={() => void grade(value)}>
                       {gradeLabels[value]}
@@ -107,45 +105,43 @@ export function ReviewsPage() {
               )}
             </>
           )}
-        </Win>
+        </Card>
+      </div>
 
-        <div className="bx-stack">
-          <Win title="Pourquoi ça marche">
-            <h2 style={{ fontSize: 16 }}>L&apos;effort de rappel est le signal.</h2>
-            <p className="bx-muted">
-              Relire donne une impression de familiarité. Tenter de répondre mesure l&apos;accès réel à la
-              connaissance — et indique quoi réviser ensuite.
-            </p>
-          </Win>
+      <div className="bx-col">
+        <Card title="Pourquoi ça marche">
+          <p style={{ fontSize: "0.95rem", fontWeight: 700 }}>L&apos;effort de rappel est le signal.</p>
+          <p className="bx-muted">
+            Relire donne une impression de familiarité. Tenter de répondre mesure l&apos;accès réel à la
+            connaissance — et indique quoi réviser ensuite.
+          </p>
+        </Card>
 
-          <Win title="Les sept prochains jours">
-            <div>
-              {queue.upcoming.map((day) => (
-                <div className="bx-stat-row" key={day.date}>
-                  <span>{new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric" }).format(new Date(`${day.date}T00:00:00`))}</span>
-                  <div style={{ flex: 1, margin: "0 10px" }}>
-                    <div className="bx-meter" style={{ height: 8 }}>
-                      <span style={{ width: `${(day.count / maxUpcoming) * 100}%` }} />
-                    </div>
-                  </div>
-                  <strong>{day.count}</strong>
+        <Card title="Sept prochains jours">
+          {queue.upcoming.map((day) => (
+            <div className="bx-stat" key={day.date}>
+              <span>
+                {new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric" }).format(new Date(`${day.date}T00:00:00`))}
+              </span>
+              <div style={{ flex: 1, margin: "0 10px" }}>
+                <div className="bx-meter">
+                  <span style={{ width: `${(day.count / maxUpcoming) * 100}%` }} />
                 </div>
-              ))}
+              </div>
+              <strong>{day.count}</strong>
             </div>
-          </Win>
+          ))}
+        </Card>
 
-          <Win title="Couverture" right={`${queue.total} cartes`}>
-            <ul className="bx-list">
-              {subjects.map((subject) => (
-                <li key={subject.id}>
-                  <span>
-                    {subject.icon} {subject.title} — {queue.total > 0 ? "dans la file" : "à venir"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Win>
-        </div>
+        <Card title="Couverture" right={`${queue.total} cartes`}>
+          <ul className="bx-list">
+            {subjects.map((subject) => (
+              <li key={subject.id}>
+                <span>{subject.icon} {subject.title}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       </div>
     </>
   );

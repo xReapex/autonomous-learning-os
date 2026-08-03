@@ -217,7 +217,7 @@ compte.
    en deux phrases et contient la condition de validité.
 
 5. **Les métadonnées.** `subject`, `goal`, `level`, `sessionMinutes` viennent de
-   l'entretien. `generatedAt` = aujourd'hui. `icon` : un glyphe monospace par
+   l'entretien. `generatedAt` = aujourd'hui. `icon` : un glyphe simple par
    matière (`↗ ◌ ◐ ✦ ⌁ △ ≋ ✣ ◇ ◎`), jamais un emoji couleur.
 
 6. **Écris** `app/content/curriculum.json`, puis **valide** :

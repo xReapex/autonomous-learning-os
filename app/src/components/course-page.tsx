@@ -7,7 +7,7 @@ import { formatClock, formatDate, formatMinutes, getSourceSegment } from "@/lib/
 import { blockCopy, blockLabels, buildStudyPlan, scheduleStudyPlan } from "@/lib/study-plan";
 import { useStudy } from "./study-context";
 import { TrackedVideo } from "./tracked-video";
-import { Win } from "./window";
+import { Card } from "./window";
 
 export function CoursePage() {
   const {
@@ -36,8 +36,8 @@ export function CoursePage() {
   const segment = getSourceSegment(source, learnBlock.minutes);
   const note = notes[subject.id] ?? "";
 
-  // Changer de matière remet la leçon au début de SA liste, pas à l'index
-  // courant — sinon on ouvrirait la leçon 4 d'une matière qui n'en a que deux.
+  // Changer de matière remet la leçon au début de SA liste : sinon on ouvrirait
+  // la leçon 4 d'une matière qui n'en a que deux.
   useEffect(() => { setLessonIndex(0); }, [selectedSubjectId]);
 
   useEffect(() => {
@@ -54,9 +54,8 @@ export function CoursePage() {
     };
   }, [focusOpen]);
 
-  // La clé force le remontage du lecteur quand on change de leçon ou qu'on passe
-  // en focus : deux iframes YouTube sur la même leçon se disputeraient les
-  // messages de progression.
+  // La clé force le remontage du lecteur : deux iframes YouTube sur la même
+  // leçon se disputeraient les messages de progression.
   const player = (mode: string) => (
     <TrackedVideo
       key={`${lesson.id}-${mode}`}
@@ -69,145 +68,127 @@ export function CoursePage() {
 
   return (
     <>
-      <div className="bx-page-head">
-        <div>
-          <p className="bx-overline">Espace cours</p>
-          <h1>Comprendre avant d&apos;accumuler.</h1>
-        </div>
-        <p className="bx-page-intro">
-          La source est découpée selon ton temps disponible. Tu ne regardes jamais un cours entier par défaut.
-        </p>
-      </div>
+      <div className="bx-col bx-col-wide">
+        <Card title={source.provider} right={source.kind === "video" ? "Vidéo" : source.kind === "reading" ? "Lecture" : "Interactif"}>
+          <div className="bx-page-head">
+            <h1>{lesson.title}</h1>
+            <p className="bx-page-intro">{lesson.objective}</p>
+          </div>
 
-      <div className="bx-subject-tabs" role="group" aria-label="Choisir une matière">
-        {subjects.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className="bx-btn"
-            aria-pressed={item.id === subject.id}
-            onClick={() => selectSubject(item.id)}
-          >
-            <span className="bx-icon" aria-hidden="true">{item.icon}</span>
-            {item.title}
-          </button>
-        ))}
-      </div>
-
-      <div className="bx-split">
-        <div className="bx-stack">
-          <Win title={source.provider} right={source.kind === "video" ? "Vidéo" : source.kind === "reading" ? "Lecture" : "Interactif"}>
-            <div className="bx-row-between">
-              <h2>{lesson.title}</h2>
-              <button type="button" className="bx-btn bx-btn-accent" onClick={() => setFocusOpen(true)}>
-                Mode focus
+          <div className="bx-segmented" role="group" aria-label="Choisir une matière">
+            {subjects.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={item.id === subject.id}
+                onClick={() => selectSubject(item.id)}
+              >
+                {item.icon} {item.title}
               </button>
+            ))}
+          </div>
+
+          {!focusOpen ? player("course") : <p className="bx-muted">Lecture en cours dans le mode focus.</p>}
+
+          <div className="bx-metric-grid">
+            <div className="bx-metric">
+              <span className="bx-metric-value">{formatMinutes(segment.watchMinutes)}</span>
+              <span className="bx-metric-label">Capsule prévue</span>
             </div>
-
-            {!focusOpen ? player("course") : <p className="bx-muted">Lecture en cours dans le mode focus.</p>}
-
-            <div className="bx-source-strip">
-              <div>
-                <span>Capsule prévue</span>
-                <strong>{formatMinutes(segment.watchMinutes)} · reprise auto</strong>
-              </div>
-              <div>
-                <span>Moment dans la session</span>
-                <strong>
-                  {formatClock(learnBlock.startsAtMinute * 60)} → {formatClock((learnBlock.startsAtMinute + segment.watchMinutes) * 60)}
-                </strong>
-              </div>
-              <div>
-                <span>Ressource complète</span>
-                <strong>{source.totalMinutes ? formatMinutes(source.totalMinutes) : "Ressource ouverte"}</strong>
-              </div>
+            <div className="bx-metric">
+              <span className="bx-metric-value">
+                {source.totalMinutes ? formatMinutes(source.totalMinutes) : "—"}
+              </span>
+              <span className="bx-metric-label">Ressource complète</span>
             </div>
+          </div>
 
-            <div>
-              <p className="bx-overline">Intention de visionnage</p>
-              <h3 style={{ marginTop: 6 }}>{source.segmentLabel}</h3>
-              <p className="bx-muted" style={{ marginTop: 6 }}>{source.why}</p>
+          <div className="bx-note">
+            <strong>Intention de visionnage</strong>
+            {source.segmentLabel} — {source.why}
+          </div>
+
+          <div className="bx-note">
+            <strong>Gratuit, vérifié le {formatDate(source.verifiedAt)}</strong>
+            {source.accessNote}
+          </div>
+
+          <div className="bx-between">
+            <button type="button" className="bx-btn" onClick={() => setFocusOpen(true)}>Mode focus</button>
+            <a className="bx-link" href={source.url} target="_blank" rel="noreferrer">Source officielle →</a>
+          </div>
+        </Card>
+
+        <Card title="Tes notes" right={note.length > 0 ? `${note.length} caractères` : "vide"}>
+          <textarea
+            className="bx-textarea"
+            value={note}
+            onChange={(event) => setNote(subject.id, event.target.value)}
+            placeholder={"Écris peu, mais utile :\n\n- une idée reformulée avec tes mots\n- un exemple qui vient de ton terrain\n- une question encore ouverte"}
+          />
+          <p className="bx-muted">Sauvegarde automatique, 700 ms après ta dernière frappe.</p>
+        </Card>
+      </div>
+
+      <div className="bx-col">
+        <Card title="Ta séquence" right={formatMinutes(duration)}>
+          {schedule.map((block, index) => (
+            <div key={`${block.kind}-${index}`} className={block.kind === "learn" ? "bx-task" : "bx-task bx-task-idle"}>
+              <span className="bx-task-meta">{formatClock(block.startsAtMinute * 60)}</span>
+              <span className="bx-task-title">{blockLabels[block.kind]}</span>
+              <span className="bx-task-meta">{block.minutes} min</span>
             </div>
+          ))}
+          <p className="bx-muted">{blockCopy[learnBlock.kind]}</p>
+        </Card>
 
-            <div className="bx-proof">
-              <strong>Gratuit vérifié le {formatDate(source.verifiedAt)}</strong>
-              <p>{source.accessNote}</p>
-              <a className="bx-link-action" href={source.url} target="_blank" rel="noreferrer">
-                Voir la source officielle
+        <Card title="À pouvoir expliquer">
+          <ul className="bx-list">
+            {lesson.keyTakeaways.map((takeaway) => <li key={takeaway}><span>{takeaway}</span></li>)}
+          </ul>
+        </Card>
+
+        {subject.lessons.length > 1 ? (
+          <Card title="Cette matière" right={`${subject.lessons.length} leçons`}>
+            {subject.lessons.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                className="bx-row"
+                onClick={() => setLessonIndex(index)}
+                aria-current={index === lessonIndex ? "true" : undefined}
+              >
+                <span className="bx-row-icon" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                <span className="bx-row-body">
+                  <span className="bx-row-title">{item.title}</span>
+                  <span className="bx-row-meta">{item.source.provider}</span>
+                </span>
+                <span className="bx-row-open">Ouvrir →</span>
+              </button>
+            ))}
+          </Card>
+        ) : null}
+
+        {lesson.alternatives.length > 0 ? (
+          <Card title="Sources de repli">
+            {lesson.alternatives.map((alternative) => (
+              <a
+                key={alternative.url}
+                className="bx-row"
+                href={alternative.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <span className="bx-row-icon" aria-hidden="true">↗</span>
+                <span className="bx-row-body">
+                  <span className="bx-row-title">{alternative.title}</span>
+                  <span className="bx-row-meta">{alternative.provider}</span>
+                </span>
+                <span className="bx-row-open">Ouvrir →</span>
               </a>
-            </div>
-
-            {lesson.alternatives.length > 0 ? (
-              <div>
-                <p className="bx-overline">Sources de repli</p>
-                <ul className="bx-list" style={{ marginTop: 8 }}>
-                  {lesson.alternatives.map((alternative) => (
-                    <li key={alternative.url}>
-                      <span>
-                        <a href={alternative.url} target="_blank" rel="noreferrer">{alternative.title}</a>
-                        {" — "}{alternative.provider}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </Win>
-
-          <Win title="Tes notes" right={note.length > 0 ? `${note.length} caractères` : "vide"}>
-            <textarea
-              className="bx-textarea"
-              value={note}
-              onChange={(event) => setNote(subject.id, event.target.value)}
-              placeholder={"Écris peu, mais utile :\n\n- une idée reformulée avec tes mots\n- un exemple qui vient de ton terrain\n- une question encore ouverte"}
-            />
-            <p className="bx-muted">Sauvegarde automatique, 700 ms après ta dernière frappe.</p>
-          </Win>
-        </div>
-
-        <div className="bx-stack">
-          <Win title="Ta séquence" right={formatMinutes(duration)}>
-            <ol className="bx-sequence">
-              {schedule.map((block, index) => (
-                <li key={`${block.kind}-${index}`} className={block.kind === "learn" ? "is-current" : undefined}>
-                  <time>{formatClock(block.startsAtMinute * 60)}</time>
-                  <div>
-                    <strong>{blockLabels[block.kind]} · {block.minutes} min</strong>
-                    <p>{blockCopy[block.kind]}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </Win>
-
-          <Win title="À pouvoir expliquer">
-            <ul className="bx-list">
-              {lesson.keyTakeaways.map((takeaway) => <li key={takeaway}><span>{takeaway}</span></li>)}
-            </ul>
-          </Win>
-
-          {subject.lessons.length > 1 ? (
-            <Win title="Cette matière" right={`${subject.lessons.length} leçons`}>
-              <ol className="bx-sequence">
-                {subject.lessons.map((item, index) => (
-                  <li key={item.id} className={index === lessonIndex ? "is-current" : undefined}>
-                    <time>{String(index + 1).padStart(2, "0")}</time>
-                    <div>
-                      <button
-                        type="button"
-                        className="bx-btn bx-btn-ghost"
-                        style={{ padding: 0, textAlign: "left" }}
-                        onClick={() => setLessonIndex(index)}
-                      >
-                        {item.title}
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </Win>
-          ) : null}
-        </div>
+            ))}
+          </Card>
+        ) : null}
       </div>
 
       {focusOpen ? (
@@ -215,42 +196,46 @@ export function CoursePage() {
           <header className="bx-focus-head">
             <div>
               <p className="bx-overline">{subject.title} · {source.segmentLabel}</p>
-              <h2 id="focus-title" style={{ fontSize: 18, marginTop: 4 }}>{lesson.title}</h2>
+              <h2 id="focus-title" style={{ fontSize: "1.2rem", marginTop: 3 }}>{lesson.title}</h2>
             </div>
-            <div className="bx-focus-controls">
-              <span className="bx-focus-clock" aria-live="polite">{formatClock(secondsRemaining)}</span>
+            <div className="bx-inline">
+              <span className="bx-clock" style={{ fontSize: "1.4rem" }} aria-live="polite">{formatClock(secondsRemaining)}</span>
               <button type="button" className="bx-btn" onClick={toggleTimer}>{isRunning ? "Pause" : "Démarrer"}</button>
-              <button type="button" className="bx-btn" onClick={resetTimer}>Réinitialiser</button>
-              <button type="button" className="bx-btn" onClick={() => setNotesVisible((current) => !current)}>
-                {notesVisible ? "Agrandir la vidéo" : "Afficher les notes"}
+              <button type="button" className="bx-btn bx-btn-ghost" onClick={resetTimer}>Réinitialiser</button>
+              <button type="button" className="bx-btn bx-btn-ghost" onClick={() => setNotesVisible((current) => !current)}>
+                {notesVisible ? "Agrandir" : "Notes"}
               </button>
-              <button type="button" className="bx-btn bx-btn-danger" onClick={() => setFocusOpen(false)}>Quitter</button>
+              <button type="button" className="bx-btn bx-btn-ghost" onClick={() => setFocusOpen(false)}>Quitter</button>
             </div>
           </header>
 
-          <div className={notesVisible ? "bx-focus-body" : "bx-focus-body notes-hidden"}>
-            <div className="bx-stack">
-              {player("focus")}
-              <div className="bx-proof">
-                <strong>Question à garder en tête</strong>
-                <p>{lesson.objective}</p>
+          <div className={notesVisible ? "bx-focus-body" : "bx-focus-body is-wide"}>
+            <div className="bx-col">
+              <div className="bx-card">
+                {player("focus")}
+                <div className="bx-note">
+                  <strong>Question à garder en tête</strong>
+                  {lesson.objective}
+                </div>
               </div>
             </div>
 
             {notesVisible ? (
-              <Win title="Notes connectées">
-                <textarea
-                  autoFocus
-                  className="bx-textarea"
-                  value={note}
-                  onChange={(event) => setNote(subject.id, event.target.value)}
-                  placeholder="Une idée par ligne. Tes mots, pas ceux du cours."
-                />
-                <div className="bx-proof">
-                  <strong>Après la vidéo</strong>
-                  <p>Ferme le cours et explique l&apos;idée principale sans relire tes notes.</p>
-                </div>
-              </Win>
+              <div className="bx-col">
+                <Card title="Notes connectées">
+                  <textarea
+                    autoFocus
+                    className="bx-textarea"
+                    value={note}
+                    onChange={(event) => setNote(subject.id, event.target.value)}
+                    placeholder="Une idée par ligne. Tes mots, pas ceux du cours."
+                  />
+                  <div className="bx-note">
+                    <strong>Après la vidéo</strong>
+                    Ferme le cours et explique l&apos;idée principale sans relire tes notes.
+                  </div>
+                </Card>
+              </div>
             ) : null}
           </div>
         </div>

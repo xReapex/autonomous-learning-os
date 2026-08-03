@@ -87,10 +87,10 @@ Budget 10 to 20 minutes, most of it spent on research.
 
 **The BizOS design**
 
-- Cream desktop, paper grain, windows with hard purple shadows, all monospace.
-- `BizOS × Learning` wordmark.
+- The V9 workspace: full-bleed wallpaper, white panels with a 1px rule and a hard 5px shadow, Inria Serif throughout.
+- Strictly monochrome — black, white, grey. Square corners, flat buttons, nothing moves on hover.
 - A built-in **wallpaper gallery** with an opacity dial — 12 procedural backgrounds shipped, plus your own.
-- Sharp corners, 2px borders, no gradients, no blur.
+- Every rule tracked against the V9 brief on `bizos-saas@main`, not an older doc.
 
 </td></tr>
 </table>

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { LessonSource } from "@/lib/curriculum";
 import { formatClock, formatDateTime } from "@/lib/format";
+import { Status } from "./window";
 import {
   getResumableSegment,
   isSegmentComplete,
@@ -181,7 +182,7 @@ export function TrackedVideo({
       <div className="bx-reading">
         <p className="bx-muted">Cette capsule est une lecture guidée.</p>
         <strong>{source.segmentLabel}</strong>
-        <a className="bx-link-action" href={source.url} target="_blank" rel="noreferrer">
+        <a className="bx-link" href={source.url} target="_blank" rel="noreferrer">
           Ouvrir la ressource officielle
         </a>
       </div>
@@ -213,7 +214,7 @@ export function TrackedVideo({
       </div>
 
       <div className="bx-video-meta">
-        <div className="bx-video-meta-row">
+        <div className="bx-between">
           <strong>
             {progress.completed
               ? "Leçon terminée"
@@ -221,19 +222,19 @@ export function TrackedVideo({
                 ? `Reprise à ${formatClock(positionSeconds)}`
                 : "Progression automatique activée"}
           </strong>
-          <span className="bx-badge" data-tone={saveStatus === "offline" ? "warn" : "live"}>{statusCopy}</span>
+          <Status on={saveStatus !== "offline"}>{statusCopy}</Status>
         </div>
 
         <div className="bx-meter" aria-label={`${watchedPercent} % de la vidéo consultée`}>
           <span style={{ width: `${watchedPercent}%` }} />
         </div>
 
-        <div className="bx-video-meta-row">
+        <div className="bx-between">
           <small>
             Capsule · {segment.startLabel} → {segment.endLabel} · vu {formatClock(positionSeconds)} / {formatClock(fullDuration)}
           </small>
           {progress.completed ? (
-            <span className="bx-badge" data-tone="done">Terminé</span>
+            <Status on>Terminé</Status>
           ) : (
             <button type="button" className="bx-btn" onClick={() => void persist(true, true)}>
               Marquer terminé

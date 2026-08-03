@@ -67,8 +67,9 @@ export function WallpaperProvider({
 
   const wallpaper = useMemo(() => resolveWallpaper(id), [id]);
 
-  // Un fond sombre bascule tout le jeu de tokens : sans ça, l'encre navy sur du
-  // navy devient illisible.
+  // Un fond sombre n'inverse QUE la chrome posée dessus — wordmark, sous-titre,
+  // barre basse. Les cartes restent blanches à texte noir dans tous les cas :
+  // c'est la règle V9, le fond apporte le monde, les panneaux restent stricts.
   useEffect(() => {
     document.documentElement.dataset.surface = isDarkWallpaper(wallpaper) ? "dark" : "light";
   }, [wallpaper]);

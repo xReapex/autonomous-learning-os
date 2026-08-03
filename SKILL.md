@@ -186,9 +186,10 @@ bash scripts/04-telegram.sh           # seulement si Q6 = oui
 
 ### Personnalisation visuelle
 
-L'app porte le design BizOS (`docs/DESIGN.md`) : bureau crème, monospace, fenêtres
-à bordure 2 px et ombre dure violette, coins nets. **Ne le remplace pas.** Ce qui
-se personnalise :
+L'app porte l'UX BizOS V9 (`docs/DESIGN.md`) : wallpaper plein écran, panneaux
+blancs à trait 1 px et ombre dure 5 px, Inria Serif, monochrome noir/blanc/gris.
+**Ne le remplace pas, et n'y réintroduis aucune couleur d'accent.** Ce qui se
+personnalise :
 
 - Le wordmark reste `BizOS × Learning`, avec le sujet de l'utilisateur en
   sous-titre (`NEXT_PUBLIC_LEARNING_SUBJECT`).
@@ -196,8 +197,8 @@ se personnalise :
   procéduraux livrés sont dans `app/src/lib/wallpapers.ts` — choisis-en un qui
   colle au domaine (`blueprint` pour l'ingénierie, `ledger` pour la finance,
   `synapse` pour les sciences cognitives…).
-- Les icônes de matières dans `curriculum.json` (`icon`) — un glyphe monospace,
-  jamais un emoji couleur.
+- Les icônes de matières dans `curriculum.json` (`icon`) — un glyphe simple,
+  jamais un emoji couleur : la V9 est monochrome.
 
 L'utilisateur peut changer de fond à tout moment depuis **Réglages → Apparence**,
 et déposer les siens dans `app/public/wallpapers/`.
