@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "subject": "Finance quantitative",
+  "goal": "Lire un prospectus d'obligation et calculer soi-même la valeur actualisée de ses flux, puis nommer les trois hypothèses qui la rendent fausse.",
+  "level": "debutant",
+  "sessionMinutes": 45,
+  "generatedAt": "2026-08-03",
+  "language": "fr",
+  "subjects": [
+    {
+      "id": "time-value",
+      "icon": "⌁",
+      "title": "Valeur temps",
+      "level": "Fondations · actualisation et risque",
+      "progress": 0,
+      "lessons": [
+        {
+          "id": "time-value-discount-01",
+          "title": "Pourquoi 100 € aujourd'hui valent plus que 110 € dans un an",
+          "objective": "Calculer une valeur actualisée et nommer ce que le taux choisi suppose.",
+          "keyTakeaways": [
+            "Le taux d'actualisation encode trois choses distinctes : le temps, l'incertitude et le coût d'opportunité.",
+            "Un rendement annoncé sans son risque associé n'est pas une information exploitable.",
+            "Changer le taux de 1 point déplace la valeur d'un flux lointain beaucoup plus que celle d'un flux proche."
+          ],
+          "prompt": "On te propose 100 € aujourd'hui ou 110 € dans un an. Écris le calcul qui te ferait choisir, puis liste les informations qui te manquent pour le faire honnêtement. Laquelle change le plus la réponse ?",
+          "source": {
+            "title": "Financial Markets — Theory of Debt, Lecture 8",
+            "provider": "Yale / Robert Shiller",
+            "kind": "video",
+            "url": "https://oyc.yale.edu/economics/econ-252-11/lecture-8",
+            "embedUrl": "https://www.youtube-nocookie.com/embed/3Ir6sbDAx4c",
+            "totalMinutes": 75,
+            "minutes": 12,
+            "why": "Shiller construit la valeur actualisée depuis l'intuition du prêt avant d'écrire la formule, et relie immédiatement le taux au prix d'une obligation réelle. C'est l'ordre dont un débutant a besoin — la formule d'abord ne s'ancre pas.",
+            "access": "free",
+            "accessNote": "Open Yale Courses : vidéos, transcriptions et syllabus en accès libre, sans inscription.",
+            "verifiedAt": "2026-08-03",
+            "segmentLabel": "Chapitre 3 : valeur actualisée, capitalisation et prix des obligations",
+            "segmentStartSeconds": 1691
+          },
+          "alternatives": [
+            {
+              "title": "Present Value of Money",
+              "provider": "MIT OpenCourseWare / 15.401 Finance Theory",
+              "kind": "reading",
+              "url": "https://ocw.mit.edu/courses/15-401-finance-theory-i-fall-2008/",
+              "minutes": 15,
+              "why": "Le support écrit du MIT donne les exercices corrigés qui manquent au cours filmé de Yale — utile en deuxième passage, pas en premier.",
+              "access": "free",
+              "accessNote": "OpenCourseWare MIT, notes de cours et problem sets téléchargeables gratuitement.",
+              "verifiedAt": "2026-08-03",
+              "segmentLabel": "Lecture notes 2 : present value, sections 1 à 3",
+              "segmentStartSeconds": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "id": "card-discount-rate",
+      "type": "Définition",
+      "front": "Qu'est-ce que le taux d'actualisation encode, exactement ?",
+      "back": "Trois choses distinctes : la préférence pour le présent, l'incertitude sur le flux futur, et le coût d'opportunité du capital. Confondre les trois, c'est ne plus savoir ce qu'on ajuste quand on change le taux.",
+      "subjectId": "time-value",
+      "lessonId": "time-value-discount-01"
+    },
+    {
+      "id": "card-yield-risk",
+      "type": "Erreur classique",
+      "front": "Pourquoi un rendement annoncé seul ne suffit-il pas à comparer deux placements ?",
+      "back": "Parce qu'il ne dit rien du risque qui le produit. Deux rendements de 7 % dont l'un porte une probabilité de perte totale ne sont pas le même actif — le rendement est le prix du risque, pas un score.",
+      "subjectId": "time-value",
+      "lessonId": "time-value-discount-01"
+    },
+    {
+      "id": "card-duration-effect",
+      "type": "Transfert",
+      "front": "Un flux à 1 an et un flux à 20 ans : lequel bouge le plus quand le taux monte d'un point ?",
+      "back": "Celui à 20 ans, et de loin — l'actualisation est exponentielle en durée. C'est pourquoi une obligation longue perd beaucoup plus de valeur qu'une courte à hausse de taux identique.",
+      "subjectId": "time-value",
+      "lessonId": "time-value-discount-01"
+    }
+  ]
+}

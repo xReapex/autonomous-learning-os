@@ -1,0 +1,32 @@
+# Secrets — jamais dans un dépôt public
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# État de setup (contient les réponses de l'entretien et les rendus de recherche)
+.setup/
+
+# Node
+node_modules/
+npm-debug.log*
+.npm
+
+# Next
+app/.next/
+app/out/
+app/build/
+
+# Données d'apprentissage locales
+app/.data/
+
+# Fonds d'écran déposés par l'utilisateur — on ne redistribue pas ses images
+app/public/wallpapers/*
+!app/public/wallpapers/.gitkeep
+!app/public/wallpapers/README.md
+
+# Système
+.DS_Store
+*.log
+.vercel/

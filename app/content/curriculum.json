@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "subject": "Apprendre à apprendre",
+  "goal": "Concevoir soi-même une session d'étude qui laisse une trace vérifiable : une idée rappelée sans support, appliquée à un cas nouveau, et programmée pour révision.",
+  "level": "debutant",
+  "sessionMinutes": 30,
+  "generatedAt": "2026-08-03",
+  "language": "fr",
+  "subjects": [
+    {
+      "id": "learning-method",
+      "icon": "◌",
+      "title": "Méthode",
+      "level": "Fondations · comment on apprend vraiment",
+      "progress": 0,
+      "lessons": [
+        {
+          "id": "method-retrieval-01",
+          "title": "Se tester bat relire",
+          "objective": "Distinguer la sensation de savoir de la capacité réelle à récupérer une information.",
+          "keyTakeaways": [
+            "La relecture produit une familiarité qui se confond facilement avec la maîtrise.",
+            "Le rappel actif mesure l'accès réel à l'information et le renforce en même temps.",
+            "L'effort de récupération est le signal : une réponse trop facile n'apprend presque rien."
+          ],
+          "prompt": "Prends une notion que tu crois maîtriser dans ton domaine. Explique-la à voix haute sans aucune note, chronomètre-toi. Où as-tu buté exactement ? Qu'est-ce que ce blocage révèle que la relecture t'aurait caché ?",
+          "source": {
+            "title": "Human Behavioral Biology — Introduction",
+            "provider": "Stanford / Robert Sapolsky",
+            "kind": "video",
+            "url": "https://www.youtube.com/watch?v=NNnIGh9g6fA",
+            "embedUrl": "https://www.youtube-nocookie.com/embed/NNnIGh9g6fA",
+            "totalMinutes": 57,
+            "minutes": 11,
+            "why": "Sapolsky ouvre son cours en démontant les catégories simples avec lesquelles on croit comprendre un comportement. C'est exactement l'illusion de compréhension que le rappel actif vient mesurer — et la démonstration est faite sur un cas concret plutôt qu'en abstrait.",
+            "access": "free",
+            "accessNote": "Cours public de la chaîne Stanford, sans inscription ni certificat payant.",
+            "verifiedAt": "2026-08-03",
+            "segmentLabel": "Pourquoi les catégories simples trompent notre compréhension",
+            "segmentStartSeconds": 0
+          }
+        },
+        {
+          "id": "method-spacing-01",
+          "title": "Espacer, pas empiler",
+          "objective": "Programmer un intervalle de révision à partir de la difficulté ressentie plutôt que du calendrier.",
+          "keyTakeaways": [
+            "Réviser juste avant d'oublier coûte moins d'effort total que réviser trop tôt.",
+            "L'intervalle utile dépend de la difficulté du rappel, pas du nombre de jours écoulés.",
+            "Une carte ratée doit revenir vite ; une carte facile doit s'espacer franchement."
+          ],
+          "prompt": "Écris trois cartes sur ce que tu as appris cette semaine. Pour chacune, dis dans combien de jours tu la reverrais et justifie l'écart entre les trois. Quelle information te manque pour choisir vraiment ?",
+          "source": {
+            "title": "Justice — The Moral Side of Murder",
+            "provider": "Harvard / Michael Sandel",
+            "kind": "video",
+            "url": "https://www.youtube.com/watch?v=kBdfcR-8hEY",
+            "embedUrl": "https://www.youtube-nocookie.com/embed/kBdfcR-8hEY",
+            "totalMinutes": 55,
+            "minutes": 12,
+            "why": "Sandel fait revenir le même dilemme sous quatre formes successives dans une seule heure. C'est un cas d'école d'entrelacement : la notion ne se fixe pas par répétition à l'identique mais par variation contrôlée du contexte.",
+            "access": "free",
+            "accessNote": "Épisode public de la chaîne Harvard University, gratuit et sans certificat requis.",
+            "verifiedAt": "2026-08-03",
+            "segmentLabel": "Le dilemme du tramway et les hypothèses cachées d'un argument",
+            "segmentStartSeconds": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "models",
+      "icon": "↗",
+      "title": "Modèles",
+      "level": "Penser · représenter pour prédire",
+      "progress": 0,
+      "lessons": [
+        {
+          "id": "models-map-territory-01",
+          "title": "Le modèle n'est pas le monde",
+          "objective": "Distinguer observation, modèle, prédiction et test sur un phénomène du quotidien.",
+          "keyTakeaways": [
+            "Un modèle garde ce qui est utile à une question précise et jette délibérément le reste.",
+            "Un bon modèle produit des prédictions qu'on peut aller vérifier — sinon c'est une histoire.",
+            "Un modèle a un domaine de validité ; hors de ce domaine il échoue normalement, pas anormalement."
+          ],
+          "prompt": "Choisis un phénomène que tu observes chaque semaine dans ton travail. Propose le modèle le plus simple qui en prédirait une partie, puis nomme précisément la situation où il échouerait. Comment saurais-tu que tu es dans cette situation ?",
+          "source": {
+            "title": "The Theoretical Minimum — Classical Mechanics, Lecture 1",
+            "provider": "Stanford / Leonard Susskind",
+            "kind": "video",
+            "url": "https://www.youtube.com/watch?v=ApUFtLCrU90",
+            "embedUrl": "https://www.youtube-nocookie.com/embed/ApUFtLCrU90",
+            "totalMinutes": 89,
+            "minutes": 13,
+            "why": "Susskind commence par des systèmes délibérément trop simples pour être réels, et explique pourquoi c'est le bon point de départ. Le raisonnement sur ce qu'un modèle a le droit d'ignorer se transfère hors de la physique.",
+            "access": "free",
+            "accessNote": "Cours public de la chaîne Stanford, en accès libre.",
+            "verifiedAt": "2026-08-03",
+            "segmentLabel": "Introduction : ce que la mécanique cherche à modéliser",
+            "segmentStartSeconds": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "icon": "≋",
+      "title": "Preuve",
+      "level": "Juger · ce qu'une donnée établit vraiment",
+      "progress": 0,
+      "lessons": [
+        {
+          "id": "evidence-claims-01",
+          "title": "Ce qu'un chiffre ne dit pas",
+          "objective": "Séparer, dans une affirmation chiffrée, la description, la causalité supposée et le jugement de valeur.",
+          "keyTakeaways": [
+            "Une corrélation historique n'établit pas, seule, une relation causale.",
+            "Un indicateur agrégé peut masquer des trajectoires opposées selon les groupes.",
+            "La question qu'une statistique éclaire bien n'est presque jamais celle qu'on lui fait porter."
+          ],
+          "prompt": "Prends une statistique citée cette semaine dans ton domaine. Écris la question qu'elle éclaire réellement, puis la question importante qu'elle ne peut pas trancher. Quelle donnée supplémentaire faudrait-il pour la seconde ?",
+          "source": {
+            "title": "The Economy — The Big Idea",
+            "provider": "CORE Econ / Wendy Carlin, UCL",
+            "kind": "video",
+            "url": "https://www.core-econ.org/the-economy/",
+            "embedUrl": "https://www.youtube-nocookie.com/embed/fxxPfvicZPU",
+            "totalMinutes": 7,
+            "minutes": 7,
+            "why": "Carlin présente une discipline qui part de problèmes réels, de données et de mécanismes plutôt que d'axiomes. En sept minutes on voit comment une question se transforme en mesure — et où la mesure cesse de répondre.",
+            "access": "free",
+            "accessNote": "Vidéo publique CORE Econ ; le manuel complet est lisible en ligne gratuitement.",
+            "verifiedAt": "2026-08-03",
+            "segmentLabel": "Partir des problèmes réels, des inégalités et des données",
+            "segmentStartSeconds": 0
+          }
+        }
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "id": "card-retrieval",
+      "type": "Méthode",
+      "front": "Pourquoi se tester avant de relire, plutôt que l'inverse ?",
+      "back": "Parce que le rappel révèle ce qui manque au lieu de le masquer : la relecture crée une familiarité qui se confond avec la maîtrise, tandis que l'effort de récupération mesure l'accès réel et le renforce.",
+      "subjectId": "learning-method",
+      "lessonId": "method-retrieval-01"
+    },
+    {
+      "id": "card-spacing",
+      "type": "Méthode",
+      "front": "Qu'est-ce qui doit fixer l'intervalle avant la prochaine révision d'une carte ?",
+      "back": "La difficulté ressentie au moment du rappel, pas le calendrier. Une récupération laborieuse rapproche l'échéance, une récupération immédiate l'éloigne franchement.",
+      "subjectId": "learning-method",
+      "lessonId": "method-spacing-01"
+    },
+    {
+      "id": "card-model",
+      "type": "Modèle mental",
+      "front": "Quelle est la différence entre un modèle et le monde qu'il décrit ?",
+      "back": "Un modèle est une représentation simplifiée qui ne garde que ce qui sert une question précise, et qui doit produire des prédictions vérifiables. Il a un domaine de validité hors duquel il échoue normalement.",
+      "subjectId": "models",
+      "lessonId": "models-map-territory-01"
+    },
+    {
+      "id": "card-revision-trigger",
+      "type": "Transfert",
+      "front": "Quand une nouvelle observation doit-elle te faire modifier ton modèle ?",
+      "back": "Quand une prédiction qui compte échoue de façon répétée. Il faut alors préciser les hypothèses, les données ou le domaine de validité — pas ajouter une exception au cas par cas.",
+      "subjectId": "models",
+      "lessonId": "models-map-territory-01"
+    },
+    {
+      "id": "card-correlation",
+      "type": "Preuve",
+      "front": "Qu'est-ce qu'une corrélation historique n'établit pas, à elle seule ?",
+      "back": "Une relation causale. Il manque un mécanisme, une variation exogène ou un contrefactuel : sans ça, la même corrélation est compatible avec plusieurs causes opposées.",
+      "subjectId": "evidence",
+      "lessonId": "evidence-claims-01"
+    },
+    {
+      "id": "card-aggregate",
+      "type": "Preuve",
+      "front": "Que peut cacher une moyenne agrégée ?",
+      "back": "Des trajectoires opposées selon les groupes : deux sous-populations qui évoluent en sens contraire produisent une moyenne stable qui ne décrit personne.",
+      "subjectId": "evidence",
+      "lessonId": "evidence-claims-01"
+    }
+  ]
+}
