@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { open, readFile, rename, stat, unlink } from "node:fs/promises";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 const ACTIVE = new Set(["queued", "running"]);
@@ -73,7 +73,6 @@ async function recoverLock(lockPath, malformedStaleMs) {
 }
 
 async function withLock(lockPath, operation, timeoutMs = 5_000) {
-  await mkdir(dirname(lockPath), { recursive: true, mode: 0o2770 });
   const token = randomUUID();
   const owner = JSON.stringify({ token, pid: process.pid });
   const deadline = Date.now() + timeoutMs;
@@ -99,7 +98,6 @@ async function withLock(lockPath, operation, timeoutMs = 5_000) {
 }
 
 async function atomicWrite(file, value) {
-  await mkdir(dirname(file), { recursive: true, mode: 0o2770 });
   const temporary = `${file}.${randomUUID()}.tmp`;
   const handle = await open(temporary, "wx", 0o660);
   try {

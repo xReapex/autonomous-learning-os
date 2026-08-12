@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -22,6 +22,10 @@ test('création, runner, redémarrage, lecture et acquittement restent durables 
   const root = await mkdtemp(join(tmpdir(), 'scio-jobs-e2e-'));
   const productionDirectory = join(root, 'production');
   const previewDirectory = join(root, 'preview');
+  await Promise.all([
+    mkdir(productionDirectory, { mode: 0o2770 }),
+    mkdir(previewDirectory, { mode: 0o2770 }),
+  ]);
   const production = createDurableJobStore({ directory: productionDirectory });
   const preview = createDurableJobStore({ directory: previewDirectory });
 

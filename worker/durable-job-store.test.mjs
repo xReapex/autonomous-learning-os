@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -14,6 +14,17 @@ async function makeStore(options = {}) {
   const directory = await mkdtemp(join(tmpdir(), "scio-jobs-"));
   return { directory, store: createDurableJobStore({ directory, ...options }) };
 }
+
+test("exige un répertoire provisionné au lieu de le créer dans le sandbox", async () => {
+  const parent = await mkdtemp(join(tmpdir(), "scio-jobs-parent-"));
+  const directory = join(parent, "missing");
+  const store = createDurableJobStore({ directory });
+  await assert.rejects(
+    store.create({ userId: userA, idempotencyKey: "generation-device-0000", payload }),
+    (error) => error?.code === "ENOENT",
+  );
+  await rm(parent, { recursive: true, force: true });
+});
 
 test("crée un job idempotent sans conserver la clé en clair", async () => {
   const { directory, store } = await makeStore();

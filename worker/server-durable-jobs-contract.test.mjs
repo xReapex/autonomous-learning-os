@@ -11,6 +11,7 @@ const previewUnit = await readFile(new URL('../deploy/scio-preview.service', bas
 const productionEnvironment = await readFile(new URL('../deploy/runtime.env.example', base), 'utf8');
 const previewEnvironment = await readFile(new URL('../deploy/scio-preview.env.example', base), 'utf8');
 const workerEnvironment = await readFile(new URL('../deploy/codex-worker.env.example', base), 'utf8');
+const provisioning = await readFile(new URL('../deploy/configure-generation-job-environments.py', base), 'utf8');
 
 for (const signal of ['SIGTERM', 'SIGINT']) {
   test(`le worker arrête les runners sur ${signal}`, () => {
@@ -37,13 +38,14 @@ test('production et preview utilisent deux stores consommés par deux runners is
 });
 
 test('les stores séparés restent privés aux services nécessaires', () => {
-  assert.match(store, /mode:\s*0o2770/);
+  assert.doesNotMatch(store, /\bmkdir\(/);
+  assert.match(provisioning, /SCIO_PRODUCTION_GENERATION_JOBS_DIR/);
   assert.match(store, /open\(lockPath,\s*\"wx\",\s*0o660\)/);
   assert.match(store, /open\(temporary,\s*\"wx\",\s*0o660\)/);
   for (const unit of [workerUnit, appUnit, previewUnit]) assert.match(unit, /UMask=0007/);
   assert.match(workerUnit, /ReadWritePaths=.*\/var\/lib\/scio-generation-jobs\/production.*\/var\/lib\/scio-generation-jobs\/preview/);
   assert.match(appUnit, /ReadWritePaths=.*\/var\/lib\/scio-generation-jobs\/production/);
-  assert.doesNotMatch(appUnit, /scio-generation-jobs\/preview/);
+  assert.doesNotMatch(appUnit, /ReadWritePaths=.*scio-generation-jobs\/preview/);
   assert.match(previewUnit, /ReadWritePaths=.*\/var\/lib\/scio-generation-jobs\/preview/);
-  assert.doesNotMatch(previewUnit, /scio-generation-jobs\/production/);
+  assert.doesNotMatch(previewUnit, /ReadWritePaths=.*scio-generation-jobs\/production/);
 });
