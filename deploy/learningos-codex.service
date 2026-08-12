@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 User=learningos-codex
 Group=learningos-codex-client
+SupplementaryGroups=scio-generation-jobs
 WorkingDirectory=/opt/autonomous-learning-os/worker
 EnvironmentFile=/etc/autonomous-learning-os/codex-worker.env
 ExecStart=/usr/bin/node /opt/autonomous-learning-os/worker/server.mjs

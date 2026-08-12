@@ -44,6 +44,17 @@ test('production et preview ne peuvent pas même lire le store opposé', async (
   assert.match(worker, /ReadWritePaths=.*production.*preview/);
 });
 
+test('les trois services déclarent explicitement le groupe partagé des stores', async () => {
+  const [production, preview, worker] = await Promise.all([
+    text('deploy/autonomous-learning-os.service'),
+    text('deploy/scio-preview.service'),
+    text('deploy/learningos-codex.service'),
+  ]);
+  for (const service of [production, preview, worker]) {
+    assert.match(service, /SupplementaryGroups=.*scio-generation-jobs/);
+  }
+});
+
 test('la migration des environnements jobs ne touche qu’aux trois clés attendues', async () => {
   const migration = await text('deploy/configure-generation-job-environments.py');
   assert.match(migration, /SCIO_GENERATION_JOBS_DIR/);

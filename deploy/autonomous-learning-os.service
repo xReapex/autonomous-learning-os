@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=learningos
 Group=learningos
-SupplementaryGroups=learningos-codex-client
+SupplementaryGroups=learningos-codex-client scio-generation-jobs
 WorkingDirectory=/opt/autonomous-learning-os/app
 EnvironmentFile=/etc/autonomous-learning-os/runtime.env
 # Le service précédent est arrêté avant ExecStartPre : ce nettoyage ne concurrence
