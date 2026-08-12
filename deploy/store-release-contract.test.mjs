@@ -32,6 +32,18 @@ test('les journaux système SCIO sont bornés à quatorze jours et un gigaoctet'
   assert.match(retention, /SystemMaxUse=1G/);
 });
 
+test('production et preview ne peuvent pas même lire le store opposé', async () => {
+  const [production, preview, worker] = await Promise.all([
+    text('deploy/autonomous-learning-os.service'),
+    text('deploy/scio-preview.service'),
+    text('deploy/learningos-codex.service'),
+  ]);
+  assert.match(production, /InaccessiblePaths=.*\/var\/lib\/scio-generation-jobs\/preview/);
+  assert.match(preview, /InaccessiblePaths=.*\/var\/lib\/scio-generation-jobs\/production/);
+  assert.doesNotMatch(worker, /InaccessiblePaths=.*\/var\/lib\/scio-generation-jobs\/(production|preview)/);
+  assert.match(worker, /ReadWritePaths=.*production.*preview/);
+});
+
 test('la migration des environnements jobs ne touche qu’aux trois clés attendues', async () => {
   const migration = await text('deploy/configure-generation-job-environments.py');
   assert.match(migration, /SCIO_GENERATION_JOBS_DIR/);

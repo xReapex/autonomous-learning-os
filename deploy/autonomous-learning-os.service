@@ -40,6 +40,7 @@ LockPersonality=true
 CapabilityBoundingSet=
 AmbientCapabilities=
 ReadWritePaths=/var/lib/autonomous-learning-os /var/lib/scio-generation-jobs/production
+InaccessiblePaths=/var/lib/scio-generation-jobs/preview
 IPAddressDeny=any
 IPAddressAllow=localhost
 UMask=0007

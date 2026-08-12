@@ -38,6 +38,7 @@ LockPersonality=true
 CapabilityBoundingSet=
 AmbientCapabilities=
 ReadWritePaths=/var/lib/scio-preview /var/lib/scio-generation-jobs/preview
+InaccessiblePaths=/var/lib/scio-generation-jobs/production
 IPAddressDeny=any
 IPAddressAllow=localhost
 UMask=0007
