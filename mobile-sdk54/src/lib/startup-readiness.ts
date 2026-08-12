@@ -7,7 +7,7 @@ export type StartupInputs = {
 };
 
 export function startupDecision(inputs: StartupInputs): 'wait' | 'ready' | 'fallback' {
-  if (inputs.timedOut) return 'fallback';
-  if (!inputs.localeReady || inputs.authChecking || (!inputs.fontsReady && !inputs.fontError)) return 'wait';
+  const blocked = !inputs.localeReady || inputs.authChecking || (!inputs.fontsReady && !inputs.fontError);
+  if (blocked) return inputs.timedOut ? 'fallback' : 'wait';
   return 'ready';
 }

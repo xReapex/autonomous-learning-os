@@ -17,6 +17,12 @@ test('le contenu essentiel reste lisible avec Dynamic Type', async () => {
   assert.match(reviews, /actions: \{ flexDirection: 'column'/);
 });
 
+test('les libellés de boutons restent lisibles avec une grande police', async () => {
+  const ui = await source('components/ui.tsx');
+  assert.match(ui, /buttonLabel:\s*\{[\s\S]*?flexShrink:\s*1/);
+  assert.match(ui, /buttonLabel:\s*\{[\s\S]*?textAlign:\s*'center'/);
+});
+
 test('les changements de réponse et de mutation sont annoncés', async () => {
   const [reviews, courses] = await Promise.all([
     source('app/(tabs)/reviews.tsx'),

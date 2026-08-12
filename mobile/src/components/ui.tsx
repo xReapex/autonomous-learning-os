@@ -439,9 +439,12 @@ const styles = StyleSheet.create({
   buttonContrast: { backgroundColor: palette.white },
   buttonDanger: { backgroundColor: palette.danger, borderColor: palette.danger },
   buttonLabel: {
+    flexShrink: 1,
     fontFamily: typography.strong,
     fontSize: 15,
     letterSpacing: 0.1,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   pressed: { opacity: 0.86, transform: [{ scale: 0.985 }] },
   disabled: { opacity: 0.4 },
