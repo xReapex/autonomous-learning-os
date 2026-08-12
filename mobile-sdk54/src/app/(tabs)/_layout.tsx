@@ -3,7 +3,7 @@ import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon } from '@/components/app-icon';
-import { elevation, layout, palette, radius, typography } from '@/constants/theme';
+import { layout, palette, typography } from '@/constants/theme';
 import { useFluidLayout } from '@/lib/use-fluid-layout';
 import { useLocale } from '@/providers/locale-provider';
 
@@ -26,37 +26,28 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: palette.canvas },
-        tabBarActiveTintColor: palette.white,
-        tabBarInactiveTintColor: palette.surfaceDeep,
+        tabBarActiveTintColor: palette.primary,
+        tabBarInactiveTintColor: palette.muted,
         tabBarHideOnKeyboard: true,
         tabBarShowLabel: !fluid.compact,
         tabBarLabelStyle: {
           fontFamily: typography.strong,
           fontSize: 10,
-          marginTop: 2,
+          marginTop: 0,
         },
         tabBarItemStyle: {
           minHeight: layout.touchTarget,
-          margin: fluid.gutter * 0.2,
-          borderRadius: radius.md,
-          paddingTop: fluid.compact ? 0 : fluid.gutter * 0.2,
+          paddingTop: fluid.compact ? 2 : 6,
+          paddingBottom: 4,
         },
         tabBarStyle: {
-          position: 'absolute',
-          left: fluid.gutter,
-          right: fluid.gutter,
-          bottom: insets.bottom + fluid.gutter * 0.4,
-          height: fluid.tabBarHeight,
-          backgroundColor: palette.ink,
-          borderColor: palette.inkSoft,
-          borderTopColor: palette.inkSoft,
-          borderWidth: 1,
+          height: fluid.tabBarHeight + insets.bottom,
+          backgroundColor: palette.paper,
+          borderTopColor: palette.surfaceDeep,
           borderTopWidth: 1,
-          borderRadius: radius.xl,
+          paddingBottom: insets.bottom,
           paddingHorizontal: fluid.gutter * 0.2,
-          ...elevation.floating,
         },
-        tabBarActiveBackgroundColor: palette.primary,
       }}>
       {tabs.map((tab) => (
         <Tabs.Screen
