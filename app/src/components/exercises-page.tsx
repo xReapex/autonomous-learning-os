@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { subjectById } from "@/lib/curriculum";
-import { formatDate } from "@/lib/format";
+import type { RewardGrant } from "@/lib/rewards";
+import { useCurriculum } from "./curriculum-context";
+import { useLocale } from "./locale-context";
+import { useRewards } from "./rewards-context";
 import { useStudy } from "./study-context";
 import { Card } from "./window";
 
@@ -14,6 +17,7 @@ type CoachResponse = {
   provider?: string;
   hint?: string;
   error?: string;
+  reward?: RewardGrant | null;
 };
 
 type HistoryEntry = {
@@ -26,8 +30,11 @@ type HistoryEntry = {
 };
 
 export function ExercisesPage() {
+  const { curriculum } = useCurriculum();
+  const { t, formatDate } = useLocale();
+  const { recordGrant } = useRewards();
   const { selectedSubjectId } = useStudy();
-  const subject = subjectById(selectedSubjectId);
+  const subject = subjectById(selectedSubjectId, curriculum);
   const lesson = subject.lesson;
 
   const [answer, setAnswer] = useState("");
@@ -36,6 +43,7 @@ export function ExercisesPage() {
   const [showReference, setShowReference] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [copied, setCopied] = useState(false);
+  const pendingEventId = useRef<string | null>(null);
 
   const loadHistory = () => {
     fetch("/api/coach", { cache: "no-store" })
@@ -53,18 +61,21 @@ export function ExercisesPage() {
     setStatus("sending");
     setResult(null);
     setCopied(false);
+    pendingEventId.current ??= crypto.randomUUID();
 
     try {
       const response = await fetch("/api/coach", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lessonId: lesson.id, answer }),
+        body: JSON.stringify({ eventId: pendingEventId.current, lessonId: lesson.id, answer }),
       });
       const body = await response.json() as CoachResponse;
-      setResult(response.ok ? body : { status: "failed", error: body.error ?? "Correction impossible." });
+      setResult(response.ok ? body : { status: "failed", error: body.error ?? t("exercises.correctionError") });
+      recordGrant(body.reward);
+      pendingEventId.current = null;
       loadHistory();
     } catch {
-      setResult({ status: "failed", error: "Le serveur n'a pas répondu." });
+      setResult({ status: "failed", error: t("exercises.serverError") });
     } finally {
       setStatus("idle");
     }
@@ -85,33 +96,33 @@ export function ExercisesPage() {
   return (
     <>
       <div className="bx-col bx-col-wide">
-        <Card title="Question du jour" right={subject.title}>
+        <Card title={t("exercises.dailyQuestion")} right={subject.title}>
           <div className="bx-page-head">
-            <p className="bx-overline">Espace exercices</p>
-            <h1>Prouve que tu as compris.</h1>
+            <p className="bx-overline">{t("exercises.space")}</p>
+            <h1>{t("exercises.title")}</h1>
           </div>
 
           <p style={{ fontSize: "1rem", lineHeight: 1.45, fontWeight: 700 }}>{lesson.prompt}</p>
 
           <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 13 }}>
             <div className="bx-field">
-              <label className="bx-label" htmlFor="answer">Ta réponse, sans rouvrir le cours</label>
+              <label className="bx-label" htmlFor="answer">{t("exercises.answerLabel")}</label>
               <textarea
                 id="answer"
                 className="bx-textarea"
                 value={answer}
                 onChange={(event) => setAnswer(event.target.value)}
-                placeholder="Explique le mécanisme, donne un exemple qui vient de ton terrain, puis cherche une limite…"
+                placeholder={t("exercises.placeholder")}
               />
             </div>
 
             <div className="bx-between">
               <button type="submit" className="bx-btn" disabled={status === "sending" || wordCount < 20}>
-                {status === "sending" ? "Correction en cours…" : "Faire corriger"}
+                {status === "sending" ? t("exercises.correcting") : t("exercises.submit")}
               </button>
               <span className="bx-muted">
-                {wordCount} mot{wordCount > 1 ? "s" : ""}
-                {wordCount < 20 ? ` · ${20 - wordCount} avant de pouvoir envoyer` : ""}
+                {t(wordCount > 1 ? "exercises.words" : "exercises.word", { count: wordCount })}
+                {wordCount < 20 ? ` · ${t("exercises.wordsRemaining", { count: 20 - wordCount })}` : ""}
               </span>
             </div>
           </form>
@@ -121,15 +132,15 @@ export function ExercisesPage() {
           {result?.status === "manual" ? (
             <>
               <div className="bx-note">
-                <strong>Aucune clé API n&apos;est configurée — c&apos;est voulu</strong>
+                <strong>{t("exercises.manualTitle")}</strong>
                 {result.hint}
               </div>
               <pre className="bx-code">{result.prompt}</pre>
               <div className="bx-inline">
                 <button type="button" className="bx-btn" onClick={copyPrompt}>
-                  {copied ? "Copié" : "Copier le prompt"}
+                  {copied ? t("exercises.copied") : t("exercises.copyPrompt")}
                 </button>
-                <span className="bx-muted">Ta réponse est déjà dans ton historique.</span>
+                <span className="bx-muted">{t("exercises.savedHistory")}</span>
               </div>
             </>
           ) : null}
@@ -139,46 +150,45 @@ export function ExercisesPage() {
       </div>
 
       <div className="bx-col">
-        <Card title="Le protocole">
+        <Card title={t("exercises.protocol")}>
           <div className="bx-task bx-task-idle">
             <span className="bx-task-meta">01</span>
-            <span className="bx-task-title">Récupère — écris ce qui revient sans aide.</span>
+            <span className="bx-task-title">{t("exercises.retrieve")}</span>
           </div>
           <div className="bx-task bx-task-idle">
             <span className="bx-task-meta">02</span>
-            <span className="bx-task-title">Transfère — applique l&apos;idée à une situation nouvelle.</span>
+            <span className="bx-task-title">{t("exercises.transfer")}</span>
           </div>
           <div className="bx-task bx-task-idle">
             <span className="bx-task-meta">03</span>
-            <span className="bx-task-title">Répare — compare, corrige, puis réexplique.</span>
+            <span className="bx-task-title">{t("exercises.repair")}</span>
           </div>
         </Card>
 
-        <Card title="Points de contrôle">
+        <Card title={t("exercises.checkpoints")}>
           {showReference ? (
             <ul className="bx-list">
               {lesson.keyTakeaways.map((item) => <li key={item}><span>{item}</span></li>)}
             </ul>
           ) : (
             <p className="bx-muted">
-              Fais d&apos;abord un effort réel. Même une mauvaise première réponse produit un meilleur signal
-              d&apos;apprentissage qu&apos;une relecture.
+              {t("exercises.effortFirst")}
             </p>
           )}
           <button type="button" className="bx-link" onClick={() => setShowReference((current) => !current)}>
-            {showReference ? "Masquer la référence" : "Comparer avec les idées clés →"}
+            {showReference ? t("exercises.hideReference") : t("exercises.compareReference")}
           </button>
         </Card>
 
         {history.length > 0 ? (
-          <Card title="Historique" right={`${history.length} réponses`}>
+          <Card title={t("exercises.history")} right={t("exercises.answers", { count: history.length })}>
             {history.slice(0, 6).map((entry) => (
               <div key={entry.id} className="bx-row">
                 <span className="bx-row-icon" aria-hidden="true">✎</span>
                 <span className="bx-row-body">
                   <span className="bx-row-title">{entry.answer.split(/\s+/).length} mots</span>
                   <span className="bx-row-meta">
-                    {formatDate(entry.createdAt)} · {entry.feedback ? "corrigé" : "en attente"}
+                    {formatDate(entry.createdAt)} · {entry.feedback ? t("exercises.corrected") : t("exercises.pending")}
                   </span>
                 </span>
               </div>

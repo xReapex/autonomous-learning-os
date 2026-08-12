@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { curriculum, sourceAudit } from "@/lib/curriculum";
+import { normalizeCurriculumDocument, sourceAudit } from "@/lib/curriculum";
 import { currentProvider, providerLabel } from "@/lib/ai";
+import { loadActiveCurriculum } from "@/lib/curriculum-store";
 import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const storage = getStorage();
-  const audit = sourceAudit();
+  const active = await loadActiveCurriculum();
+  const curriculum = normalizeCurriculumDocument(active.document);
+  const audit = sourceAudit(curriculum);
 
   let storageOk = false;
   let storageError: string | null = null;
@@ -25,11 +28,15 @@ export async function GET() {
   const provider = currentProvider();
 
   return NextResponse.json({
-    ok: storageOk,
+    ok: storageOk && !active.error,
     storage: { driver: storage.driver, ok: storageOk, error: storageError },
     ai: { provider, label: providerLabel(provider) },
     telegram: { enabled: process.env.TELEGRAM_ENABLED === "true" },
     curriculum: {
+      source: active.source,
+      revision: active.revision,
+      ok: !active.error,
+      error: active.error ?? null,
       subject: curriculum.subject,
       goal: curriculum.goal,
       generatedAt: curriculum.generatedAt,

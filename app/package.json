@@ -1,8 +1,8 @@
 {
-  "name": "learning-os",
+  "name": "scio",
   "version": "1.0.0",
   "private": true,
-  "description": "Ton dashboard d'apprentissage — BizOS × Learning",
+  "description": "SCIO — apprendre, pratiquer, maîtriser",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,7 +14,7 @@
     "curriculum:check": "node ../scripts/validate-curriculum.mjs content/curriculum.json"
   },
   "dependencies": {
-    "next": "16.2.12",
+    "next": "16.3.0",
     "pg": "^8.13.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
@@ -25,7 +25,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.12",
+    "eslint-config-next": "16.3.0",
     "typescript": "^5",
     "vitest": "^4.0.18"
   }

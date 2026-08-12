@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "SCIO",
+    "slug": "scio",
+    "version": "1.0.0",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "orientation": "portrait",
+    "icon": "./assets/brand/icon-v5.png",
+    "scheme": "scio",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F5F7F6",
+    "ios": {
+      "bundleIdentifier": "io.scio.app",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "io.scio.app",
+      "versionCode": 1,
+      "allowBackup": false,
+      "permissions": [],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#0B5D57",
+        "foregroundImage": "./assets/brand/adaptive-foreground-v5.png",
+        "monochromeImage": "./assets/brand/adaptive-monochrome-v5.png"
+      },
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/brand/favicon-v5.png",
+      "backgroundColor": "#F5F7F6"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F5F7F6",
+          "image": "./assets/brand/splash-v5.png",
+          "imageWidth": 168,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": false,
+          "faceIDPermission": false
+        }
+      ],
+      "expo-apple-authentication",
+      "expo-system-ui",
+      "./plugins/with-scio-google-auth",
+      "./plugins/with-scio-android-backup",
+      "./plugins/with-scio-privacy-manifest"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

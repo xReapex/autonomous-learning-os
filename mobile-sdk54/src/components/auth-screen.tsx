@@ -1,0 +1,178 @@
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { BrandLoader } from '@/components/brand-loader';
+import { ScioMark } from '@/components/scio-mark';
+import { Button, Reveal } from '@/components/ui';
+import { elevation, palette, radius, spacing, typography } from '@/constants/theme';
+import { useFluidLayout } from '@/lib/use-fluid-layout';
+import { useAuth } from '@/providers/auth-provider';
+import { useLocale } from '@/providers/locale-provider';
+
+export function AuthScreen() {
+  const { provider, signInDevelopment, status } = useAuth();
+  const { t } = useLocale();
+  const fluid = useFluidLayout();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const connectDevelopmentProfile = async () => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await signInDevelopment();
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View
+          style={[
+            styles.content,
+            {
+              width: fluid.contentWidth,
+              paddingHorizontal: fluid.gutter,
+              paddingTop: fluid.gutter,
+              paddingBottom: fluid.gutter,
+              gap: fluid.sectionGap,
+            },
+          ]}>
+          <Reveal style={styles.brandBar}>
+            <View style={[styles.markFrame, { width: fluid.controlSize, aspectRatio: 1 }]}>
+              <ScioMark size={fluid.controlSize * 0.8} monochrome />
+            </View>
+            <Text style={styles.wordmark}>SCIO</Text>
+          </Reveal>
+
+          <Reveal delay={60} style={styles.editorial}>
+            <Text style={styles.index}>01 — {t('auth.tagline')}</Text>
+            <Text style={[styles.statement, { fontSize: fluid.titleSize * 1.14, lineHeight: fluid.titleLineHeight * 1.14 }]}>
+              {t(provider === 'unavailable' ? 'auth.unavailableTitle' : 'auth.title')}
+            </Text>
+            <Text style={styles.introduction}>
+              {t(provider === 'unavailable' ? 'auth.unavailableBody' : 'auth.body')}
+            </Text>
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.rule}>
+              <View style={styles.ruleFill} />
+            </View>
+          </Reveal>
+
+          {status === 'checking' ? (
+            <View style={styles.loading}>
+              <BrandLoader caption={t('auth.checking')} />
+            </View>
+          ) : (
+            <Reveal delay={120} style={[styles.actionSheet, { padding: fluid.cardPadding }]}>
+              <View style={styles.sheetTopline}>
+                <Text style={styles.sheetIndex}>ACCESS</Text>
+                {provider === 'development' ? (
+                  <Text style={styles.previewBadge}>{t('auth.developmentEyebrow')}</Text>
+                ) : null}
+              </View>
+
+              {provider === 'development' ? (
+                <>
+                  <Button
+                    busy={busy}
+                    disabled={busy}
+                    icon="user"
+                    label={t('auth.continueDevelopment')}
+                    onPress={() => void connectDevelopmentProfile()}
+                  />
+                  <Text style={styles.note}>{t('auth.developmentNote')}</Text>
+                </>
+              ) : null}
+
+              {failed ? (
+                <Text accessibilityRole="alert" style={styles.error}>
+                  {t('auth.error')}
+                </Text>
+              ) : null}
+            </Reveal>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: palette.canvas },
+  scrollContent: { flexGrow: 1 },
+  content: {
+    width: '100%',
+    minHeight: '100%',
+    alignSelf: 'center',
+    justifyContent: 'space-between',
+  },
+  brandBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  markFrame: {
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.paper,
+    borderWidth: 1,
+    borderColor: palette.surfaceDeep,
+  },
+  wordmark: {
+    color: palette.ink,
+    fontFamily: typography.brand,
+    fontSize: 19,
+    letterSpacing: 4.8,
+  },
+  editorial: { flex: 1, justifyContent: 'center', gap: spacing.lg, paddingVertical: spacing.xxl },
+  index: {
+    color: palette.primaryText,
+    fontFamily: typography.bold,
+    fontSize: 10,
+    letterSpacing: 1.35,
+    textTransform: 'uppercase',
+  },
+  statement: {
+    color: palette.ink,
+    fontFamily: typography.display,
+    letterSpacing: -1.45,
+  },
+  introduction: {
+    color: palette.muted,
+    fontFamily: typography.body,
+    fontSize: 17,
+    lineHeight: 26,
+  },
+  rule: { width: '100%', height: 4, marginTop: spacing.sm, backgroundColor: palette.surfaceDeep },
+  ruleFill: { width: '28%', height: '100%', backgroundColor: palette.primary },
+  loading: { flex: 1, justifyContent: 'center' },
+  actionSheet: {
+    gap: spacing.lg,
+    borderRadius: radius.xl,
+    backgroundColor: palette.paper,
+    borderWidth: 1,
+    borderColor: palette.surfaceDeep,
+    ...elevation.soft,
+  },
+  sheetTopline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  sheetIndex: { color: palette.faint, fontFamily: typography.bold, fontSize: 10, letterSpacing: 1.4 },
+  previewBadge: {
+    color: palette.primaryText,
+    fontFamily: typography.bold,
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: palette.primaryMist,
+  },
+  note: { color: palette.faint, fontFamily: typography.body, fontSize: 12, lineHeight: 18 },
+  error: { color: palette.danger, fontFamily: typography.body, fontSize: 14, lineHeight: 20 },
+});

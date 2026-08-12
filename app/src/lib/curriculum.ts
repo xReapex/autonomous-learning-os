@@ -1,50 +1,44 @@
-// Le curriculum est une DONNÉE, pas du code : il vient de content/curriculum.json,
-// écrit par la deep research. Ce module le charge, le normalise et le rend
-// typé au reste de l'app.
-//
-// Choix : import JSON statique plutôt que lecture disque. Le curriculum ne
-// change pas pendant qu'une session tourne, et l'import statique le rend
-// disponible côté client sans aller-retour réseau.
+// Le curriculum est une DONNÉE, pas du code. Le document livré reste le
+// fallback immuable ; un document runtime peut être injecté sans rebuild.
 
 import raw from "../../content/curriculum.json";
 
-export type SourceKind = "video" | "reading" | "interactive";
+export type SourceKind = "video";
 
-export type LessonSource = {
+export type CurriculumSource = {
   title: string;
   provider: string;
   kind: SourceKind;
+  language: string;
   url: string;
-  embedUrl?: string;
-  totalMinutes?: number;
+  embedUrl: string;
+  totalMinutes: number;
   minutes: number;
   why: string;
   access: "free";
   accessNote: string;
   verifiedAt: string;
   segmentLabel: string;
-  segmentStartSeconds: number;
+  segmentStartSeconds?: number;
 };
 
-export type Lesson = {
+export type CurriculumLesson = {
   id: string;
   title: string;
   objective: string;
   keyTakeaways: string[];
   prompt: string;
-  source: LessonSource;
-  alternatives: LessonSource[];
+  source: CurriculumSource;
+  alternatives?: CurriculumSource[];
 };
 
-export type Subject = {
+export type CurriculumSubject = {
   id: string;
   icon: string;
   title: string;
   level: string;
-  progress: number;
-  lessons: Lesson[];
-  /** Raccourci vers la leçon courante — celle que l'app présente par défaut. */
-  lesson: Lesson;
+  progress?: number;
+  lessons: CurriculumLesson[];
 };
 
 export type ReviewCard = {
@@ -56,32 +50,51 @@ export type ReviewCard = {
   lessonId?: string;
 };
 
-export type Curriculum = {
+export type CurriculumDocument = {
+  version: 1;
   subject: string;
   goal: string;
-  level: string;
-  sessionMinutes: number;
+  level?: "debutant" | "intermediaire" | "avance";
+  sessionMinutes?: 15 | 30 | 45 | 60 | 90 | 120 | 180;
+  generatedAt: string;
+  language: string;
+  subjects: CurriculumSubject[];
+  cards: ReviewCard[];
+};
+
+export type LessonSource = Omit<CurriculumSource, "segmentStartSeconds"> & {
+  segmentStartSeconds: number;
+};
+
+export type Lesson = Omit<CurriculumLesson, "source" | "alternatives"> & {
+  source: LessonSource;
+  alternatives: LessonSource[];
+};
+
+export type Subject = Omit<CurriculumSubject, "progress" | "lessons"> & {
+  progress: number;
+  lessons: Lesson[];
+  /** Raccourci runtime ; il n'est jamais sérialisé dans CurriculumDocument. */
+  lesson: Lesson;
+};
+
+export type Curriculum = {
+  version: 1;
+  subject: string;
+  goal: string;
+  level: "debutant" | "intermediaire" | "avance";
+  sessionMinutes: 15 | 30 | 45 | 60 | 90 | 120 | 180;
   generatedAt: string;
   language: string;
   subjects: Subject[];
   cards: ReviewCard[];
 };
 
-type RawSource = Omit<LessonSource, "segmentStartSeconds"> & { segmentStartSeconds?: number };
-type RawLesson = Omit<Lesson, "source" | "alternatives"> & {
-  source: RawSource;
-  alternatives?: RawSource[];
-};
-type RawSubject = Omit<Subject, "lesson" | "progress" | "lessons"> & {
-  progress?: number;
-  lessons: RawLesson[];
-};
-
-function normalizeSource(source: RawSource): LessonSource {
+function normalizeSource(source: CurriculumSource): LessonSource {
   return { ...source, segmentStartSeconds: source.segmentStartSeconds ?? 0 };
 }
 
-function normalizeLesson(lesson: RawLesson): Lesson {
+function normalizeLesson(lesson: CurriculumLesson): Lesson {
   return {
     ...lesson,
     source: normalizeSource(lesson.source),
@@ -89,7 +102,7 @@ function normalizeLesson(lesson: RawLesson): Lesson {
   };
 }
 
-function normalizeSubject(subject: RawSubject): Subject {
+function normalizeSubject(subject: CurriculumSubject): Subject {
   const lessons = subject.lessons.map(normalizeLesson);
   return {
     ...subject,
@@ -99,37 +112,35 @@ function normalizeSubject(subject: RawSubject): Subject {
   };
 }
 
-const document = raw as unknown as {
-  subject: string;
-  goal: string;
-  level?: string;
-  sessionMinutes?: number;
-  generatedAt: string;
-  language?: string;
-  subjects: RawSubject[];
-  cards: ReviewCard[];
-};
+export const defaultCurriculumDocument = raw as unknown as CurriculumDocument;
 
-export const curriculum: Curriculum = {
-  subject: document.subject,
-  goal: document.goal,
-  level: document.level ?? "debutant",
-  sessionMinutes: document.sessionMinutes ?? 30,
-  generatedAt: document.generatedAt,
-  language: document.language ?? "fr",
-  subjects: document.subjects.map(normalizeSubject),
-  cards: document.cards,
-};
+export function normalizeCurriculumDocument(document: CurriculumDocument): Curriculum {
+  return {
+    version: document.version,
+    subject: document.subject,
+    goal: document.goal,
+    level: document.level ?? "debutant",
+    sessionMinutes: document.sessionMinutes ?? 30,
+    generatedAt: document.generatedAt,
+    language: document.language,
+    subjects: document.subjects.map(normalizeSubject),
+    cards: document.cards.map((card) => ({ ...card })),
+  };
+}
 
+export const curriculum: Curriculum = normalizeCurriculumDocument(defaultCurriculumDocument);
 export const subjects = curriculum.subjects;
 export const dailyCards = curriculum.cards;
 
-export function subjectById(id: string): Subject {
-  return subjects.find((subject) => subject.id === id) ?? subjects[0];
+export function subjectById(id: string, active: Curriculum = curriculum): Subject {
+  return active.subjects.find((subject) => subject.id === id) ?? active.subjects[0];
 }
 
-export function lessonById(lessonId: string): { subject: Subject; lesson: Lesson } | undefined {
-  for (const subject of subjects) {
+export function lessonById(
+  lessonId: string,
+  active: Curriculum = curriculum,
+): { subject: Subject; lesson: Lesson } | undefined {
+  for (const subject of active.subjects) {
     const lesson = subject.lessons.find((item) => item.id === lessonId);
     if (lesson) return { subject, lesson };
   }
@@ -137,18 +148,20 @@ export function lessonById(lessonId: string): { subject: Subject; lesson: Lesson
 }
 
 /** Toutes les leçons, à plat, dans l'ordre du cursus. */
-export function allLessons(): { subject: Subject; lesson: Lesson }[] {
-  return subjects.flatMap((subject) => subject.lessons.map((lesson) => ({ subject, lesson })));
+export function allLessons(active: Curriculum = curriculum): { subject: Subject; lesson: Lesson }[] {
+  return active.subjects.flatMap((subject) =>
+    subject.lessons.map((lesson) => ({ subject, lesson })),
+  );
 }
 
 /** Combien de sources ont été vérifiées, et à quelle date la plus ancienne. */
-export function sourceAudit() {
-  const sources = allLessons().map(({ lesson }) => lesson.source);
+export function sourceAudit(active: Curriculum = curriculum) {
+  const sources = allLessons(active).map(({ lesson }) => lesson.source);
   const dates = sources.map((source) => source.verifiedAt).sort();
   return {
     total: sources.length,
     providers: new Set(sources.map((source) => source.provider)).size,
-    oldestVerification: dates[0] ?? curriculum.generatedAt,
-    newestVerification: dates[dates.length - 1] ?? curriculum.generatedAt,
+    oldestVerification: dates[0] ?? active.generatedAt,
+    newestVerification: dates[dates.length - 1] ?? active.generatedAt,
   };
 }

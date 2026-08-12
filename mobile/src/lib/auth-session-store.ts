@@ -1,0 +1,92 @@
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+
+import { createAuthApi } from './auth-api';
+import type { AuthProvider } from './auth-policy';
+import type { AuthSession } from './auth-session-core';
+import { resolveApiConfiguration } from './api-url';
+import { authAccessTokenKey, authSessionStorageKey } from './secure-store-keys';
+import { createSocialReauthentication, createSocialSignIn } from './social-auth-core';
+import { createNativeIdentityRequester } from './social-auth-native-core';
+import { appleNativeAdapter, clearGoogleCredentialState, googleNativeAdapter, isGoogleNativeAvailable } from './social-auth-native';
+
+function apiClient() {
+  const configuration = resolveApiConfiguration(
+    process.env.EXPO_PUBLIC_API_URL,
+    false,
+    false,
+  );
+  if (configuration.mode !== 'remote') throw new Error('auth_api_required');
+
+  return createAuthApi({
+    baseUrl: configuration.baseUrl,
+    tokenStorage: {
+      get: () => SecureStore.getItemAsync(authAccessTokenKey),
+      set: (token) =>
+        SecureStore.setItemAsync(authAccessTokenKey, token, {
+          keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+        }),
+      clear: () => SecureStore.deleteItemAsync(authAccessTokenKey),
+    },
+  });
+}
+
+export async function readAuthSession(provider: AuthProvider): Promise<AuthSession | null> {
+  if (provider === 'unavailable') return null;
+  const session = await apiClient().restore();
+  if (!session) return null;
+  if (session.user.provider !== provider) {
+    await apiClient().clearLocalToken();
+    return null;
+  }
+  return session;
+}
+
+export function createAndStoreDevelopmentSession(): Promise<AuthSession> {
+  return apiClient().signInDevelopment();
+}
+
+export async function createAndStoreSocialSession(provider: 'google' | 'apple'): Promise<AuthSession | null> {
+  const platform = Platform.OS === 'android' || Platform.OS === 'ios' ? Platform.OS : 'web';
+  const requestIdentity = createNativeIdentityRequester({
+    platform,
+    googleConfigured: isGoogleNativeAvailable(),
+    google: platform === 'android' ? googleNativeAdapter : null,
+    apple: platform === 'ios' ? appleNativeAdapter : null,
+  });
+  const result = await createSocialSignIn({ api: apiClient(), requestIdentity })(provider);
+  return result.type === 'cancelled' ? null : result.session;
+}
+
+export async function createSocialReauthenticationProof(
+  provider: 'google' | 'apple',
+): Promise<string | null> {
+  const platform = Platform.OS === 'android' || Platform.OS === 'ios' ? Platform.OS : 'web';
+  const requestIdentity = createNativeIdentityRequester({
+    platform,
+    googleConfigured: isGoogleNativeAvailable(),
+    google: platform === 'android' ? googleNativeAdapter : null,
+    apple: platform === 'ios' ? appleNativeAdapter : null,
+  });
+  const result = await createSocialReauthentication({ api: apiClient(), requestIdentity })(provider);
+  return result.type === 'cancelled' ? null : result.proof;
+}
+
+export function revokeAuthSession(): Promise<void> {
+  return apiClient().signOut();
+}
+
+export async function clearSocialCredentialState(provider: AuthProvider): Promise<void> {
+  if (provider === 'google') await clearGoogleCredentialState();
+}
+
+export function deleteServerAccount(reauthenticationProof?: string): Promise<void> {
+  return apiClient().deleteAccount(reauthenticationProof);
+}
+
+export async function clearAuthSession(): Promise<void> {
+  await Promise.allSettled([
+    SecureStore.deleteItemAsync(authAccessTokenKey),
+    SecureStore.deleteItemAsync(authSessionStorageKey),
+  ]);
+}

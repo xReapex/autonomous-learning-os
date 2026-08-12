@@ -1,5 +1,6 @@
 import type { CardState } from "@/lib/scheduler";
 import type { LessonProgress } from "@/lib/lesson-progress";
+import type { RewardEvent, RewardGrant, RewardState } from "@/lib/rewards";
 
 /**
  * L'interface que les deux pilotes respectent. L'app n'appelle jamais autre
@@ -22,6 +23,9 @@ export type Storage = {
 
   appendAnswer(answer: StoredAnswer): Promise<StoredAnswer>;
   listAnswers(limit?: number): Promise<StoredAnswer[]>;
+
+  getRewardState(): Promise<RewardState>;
+  awardReward(event: RewardEvent): Promise<RewardGrant>;
 
   /** Vérifie que le backend répond. Utilisé par /api/health. */
   ping(): Promise<boolean>;

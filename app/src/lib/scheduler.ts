@@ -121,12 +121,13 @@ export function dueCards(states: CardState[], now = new Date()): CardState[] {
 }
 
 /** Aperçu de l'intervalle qu'une note produirait, pour l'afficher sur le bouton. */
-export function previewInterval(state: CardState, grade: ReviewGrade): string {
+export function previewInterval(state: CardState, grade: ReviewGrade, locale: "fr" | "en" = "fr"): string {
   const next = gradeCard(state, grade);
-  if (next.intervalDays === 1) return "demain";
-  if (next.intervalDays < 30) return `dans ${next.intervalDays} j`;
+  if (next.intervalDays === 1) return locale === "fr" ? "demain" : "tomorrow";
+  if (next.intervalDays < 30) return locale === "fr" ? `dans ${next.intervalDays} j` : `in ${next.intervalDays}d`;
   const months = Math.round(next.intervalDays / 30);
-  return months < 12 ? `dans ${months} mois` : `dans ${Math.round(months / 12)} an(s)`;
+  if (months < 12) return locale === "fr" ? `dans ${months} mois` : `in ${months}mo`;
+  return locale === "fr" ? `dans ${Math.round(months / 12)} an(s)` : `in ${Math.round(months / 12)}y`;
 }
 
 /** Répartition de la file à venir, pour la vue d'ensemble des révisions. */

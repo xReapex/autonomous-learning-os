@@ -15,8 +15,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { subjects } from "@/lib/curriculum";
 import { studyDurations } from "@/lib/study-plan";
+import { useCurriculum } from "./curriculum-context";
 
 type ApiState = "checking" | "ok" | "down";
 
@@ -37,13 +37,65 @@ type StudyValue = {
 };
 
 const StudyContext = createContext<StudyValue | null>(null);
-const PREFS_KEY = "bizos-learning:preferences";
+const PREFS_KEY = "scio:preferences";
+
+type StoredDurationPreferences = {
+  duration?: number;
+  durationCustomized?: boolean;
+};
+
+export function storedDurationPreference(prefs: StoredDurationPreferences): number | undefined {
+  const legacyCustomDuration = prefs.duration !== undefined && prefs.duration !== 30;
+  return prefs.duration &&
+    (prefs.durationCustomized === true || legacyCustomDuration) &&
+    (studyDurations as readonly number[]).includes(prefs.duration)
+    ? prefs.duration
+    : undefined;
+}
+
+export function shouldApplyCurriculumDuration(customized: boolean, running: boolean): boolean {
+  return !customized && !running;
+}
+
+type CurriculumDurationDecisionInput = {
+  customized: boolean;
+  running: boolean;
+  curriculumChanged: boolean;
+  curriculumMinutes: number;
+  pendingMinutes: number | null;
+};
+
+export function curriculumDurationDecision(input: CurriculumDurationDecisionInput): {
+  applyMinutes: number | null;
+  pendingMinutes: number | null;
+} {
+  if (input.customized) return { applyMinutes: null, pendingMinutes: null };
+  if (input.curriculumChanged) {
+    return input.running
+      ? { applyMinutes: null, pendingMinutes: input.curriculumMinutes }
+      : { applyMinutes: input.curriculumMinutes, pendingMinutes: null };
+  }
+  if (!input.running && input.pendingMinutes !== null) {
+    return { applyMinutes: input.pendingMinutes, pendingMinutes: null };
+  }
+  return { applyMinutes: null, pendingMinutes: input.pendingMinutes };
+}
 
 export function StudyProvider({ children, defaultMinutes = 30 }: { children: ReactNode; defaultMinutes?: number }) {
-  const [duration, setDuration] = useState(defaultMinutes);
+  const { curriculum } = useCurriculum();
+  const subjects = curriculum.subjects;
+  const curriculumMinutes = curriculum.sessionMinutes ?? defaultMinutes;
+  const initialSubjectIds = useRef(new Set(subjects.map((subject) => subject.id)));
+  const durationCustomized = useRef(false);
+  const [duration, setDuration] = useState<number>(curriculumMinutes);
   const [selectedSubjectId, setSelectedSubjectId] = useState(subjects[0].id);
-  const [secondsRemaining, setSecondsRemaining] = useState(defaultMinutes * 60);
+  const effectiveSubjectId = subjects.some((subject) => subject.id === selectedSubjectId)
+    ? selectedSubjectId
+    : subjects[0].id;
+  const [secondsRemaining, setSecondsRemaining] = useState(curriculumMinutes * 60);
   const [isRunning, setIsRunning] = useState(false);
+  const previousCurriculumMinutes = useRef(curriculumMinutes);
+  const pendingCurriculumMinutes = useRef<number | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [apiState, setApiState] = useState<ApiState>("checking");
   const [aiLabel, setAiLabel] = useState("—");
@@ -52,30 +104,54 @@ export function StudyProvider({ children, defaultMinutes = 30 }: { children: Rea
   const saveTimers = useRef(new Map<string, number>());
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- client-only localStorage restoration must run after SSR hydration */
     try {
-      const prefs = JSON.parse(window.localStorage.getItem(PREFS_KEY) ?? "{}") as {
-        duration?: number;
+      const prefs = JSON.parse(window.localStorage.getItem(PREFS_KEY) ?? "{}") as StoredDurationPreferences & {
         selectedSubjectId?: string;
       };
-      if (prefs.duration && (studyDurations as readonly number[]).includes(prefs.duration)) {
-        setDuration(prefs.duration);
-        setSecondsRemaining(prefs.duration * 60);
+      const storedDuration = storedDurationPreference(prefs);
+      if (storedDuration) {
+        durationCustomized.current = true;
+        setDuration(storedDuration);
+        setSecondsRemaining(storedDuration * 60);
       }
-      if (prefs.selectedSubjectId && subjects.some((s) => s.id === prefs.selectedSubjectId)) {
+      if (prefs.selectedSubjectId && initialSubjectIds.current.has(prefs.selectedSubjectId)) {
         setSelectedSubjectId(prefs.selectedSubjectId);
       }
     } catch {
       // Préférences illisibles : on garde les valeurs par défaut.
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   useEffect(() => {
+    const curriculumChanged = previousCurriculumMinutes.current !== curriculumMinutes;
+    previousCurriculumMinutes.current = curriculumMinutes;
+    const decision = curriculumDurationDecision({
+      customized: durationCustomized.current,
+      running: isRunning,
+      curriculumChanged,
+      curriculumMinutes,
+      pendingMinutes: pendingCurriculumMinutes.current,
+    });
+    pendingCurriculumMinutes.current = decision.pendingMinutes;
+    if (decision.applyMinutes !== null) {
+      setDuration(decision.applyMinutes);
+      setSecondsRemaining(decision.applyMinutes * 60);
+    }
+  }, [curriculumMinutes, isRunning]);
+
+  useEffect(() => {
     try {
-      window.localStorage.setItem(PREFS_KEY, JSON.stringify({ duration, selectedSubjectId }));
+      window.localStorage.setItem(PREFS_KEY, JSON.stringify({
+        duration,
+        durationCustomized: durationCustomized.current,
+        selectedSubjectId: effectiveSubjectId,
+      }));
     } catch {
       // Stockage indisponible : la session reste utilisable.
     }
-  }, [duration, selectedSubjectId]);
+  }, [duration, effectiveSubjectId]);
 
   // Les notes vivent côté serveur : c'est ce qui les rend disponibles depuis un
   // autre appareil quand on branche Postgres.
@@ -146,7 +222,7 @@ export function StudyProvider({ children, defaultMinutes = 30 }: { children: Rea
 
   const value = useMemo<StudyValue>(() => ({
     duration,
-    selectedSubjectId,
+    selectedSubjectId: effectiveSubjectId,
     secondsRemaining,
     isRunning,
     notes,
@@ -154,11 +230,14 @@ export function StudyProvider({ children, defaultMinutes = 30 }: { children: Rea
     aiLabel,
     storageDriver,
     chooseDuration(minutes) {
+      durationCustomized.current = true;
       setDuration(minutes);
       setSecondsRemaining(minutes * 60);
       setIsRunning(false);
     },
-    selectSubject: setSelectedSubjectId,
+    selectSubject(subjectId) {
+      if (subjects.some((subject) => subject.id === subjectId)) setSelectedSubjectId(subjectId);
+    },
     toggleTimer() {
       // Un chrono à zéro qu'on relance repart pour une session complète : c'est
       // ce que veut dire « Recommencer ».
@@ -174,7 +253,7 @@ export function StudyProvider({ children, defaultMinutes = 30 }: { children: Rea
       setIsRunning(false);
     },
     setNote,
-  }), [aiLabel, apiState, duration, isRunning, notes, secondsRemaining, selectedSubjectId, setNote, storageDriver]);
+  }), [aiLabel, apiState, duration, effectiveSubjectId, isRunning, notes, secondsRemaining, setNote, storageDriver, subjects]);
 
   return <StudyContext.Provider value={value}>{children}</StudyContext.Provider>;
 }

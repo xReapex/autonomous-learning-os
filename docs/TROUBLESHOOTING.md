@@ -179,10 +179,12 @@ un vrai serveur :
 bash scripts/05-verify.sh
 ```
 
-### Sur Vercel, le stockage fichier ne persiste rien
+### Le stockage disparaît après un déploiement serverless direct
 
-Attendu : le système de fichiers y est éphémère. Une app déployée a besoin de
-Postgres. C'est justement ce que le mode `postgres` résout.
+Ce mode de déploiement n’est pas pris en charge : Postgres ne remplace ni la
+Basic Auth globale, ni l’injection serveur du secret de mutation, ni le
+confinement réseau. Déploie exclusivement avec le contrat auditable de
+[`deploy/`](../deploy/), puis choisis le stockage dans cette frontière sécurisée.
 
 ---
 

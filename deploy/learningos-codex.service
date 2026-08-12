@@ -1,0 +1,52 @@
+[Unit]
+Description=Learning OS Codex interview worker (no model tools)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=learningos-codex
+Group=learningos-codex-client
+WorkingDirectory=/opt/autonomous-learning-os/worker
+EnvironmentFile=/etc/autonomous-learning-os/codex-worker.env
+ExecStart=/usr/bin/node /opt/autonomous-learning-os/worker/server.mjs
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+RuntimeDirectory=learningos-codex
+RuntimeDirectoryMode=0750
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+RemoveIPC=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @privileged @raw-io @reboot @swap
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/learningos-codex /var/lib/scio-generation-jobs/production /var/lib/scio-generation-jobs/preview
+InaccessiblePaths=/var/lib/autonomous-learning-os /opt/autonomous-learning-os/app /etc/autonomous-learning-os/runtime.env /etc/nginx
+IPAddressDeny=0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.0.0.0/24 192.0.2.0/24 192.88.99.0/24 192.168.0.0/16 198.18.0.0/15 198.51.100.0/24 203.0.113.0/24 224.0.0.0/4 240.0.0.0/4 ::1/128 ::/96 64:ff9b::/96 64:ff9b:1::/48 2001::/32 2002::/16 fc00::/7 fe80::/10 fec0::/10 ff00::/8
+IPAddressAllow=127.0.0.53/32
+UMask=0007
+TasksMax=32
+MemoryMax=512M
+CPUQuota=80%
+
+[Install]
+WantedBy=multi-user.target

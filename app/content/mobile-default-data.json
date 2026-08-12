@@ -1,0 +1,242 @@
+{
+  "curriculum": {
+    "learnerName": "Camille",
+    "course": {
+      "id": "clear-thinking",
+      "title": {
+        "fr": "Penser avec clarté",
+        "en": "Thinking with clarity"
+      },
+      "description": {
+        "fr": "Des outils concrets pour mieux raisonner, décider et apprendre.",
+        "en": "Practical tools for reasoning, deciding and learning more effectively."
+      },
+      "modules": [
+        {
+          "id": "foundations",
+          "title": {
+            "fr": "Fondations",
+            "en": "Foundations"
+          },
+          "lessons": [
+            {
+              "id": "recognize-bias",
+              "title": {
+                "fr": "Apprendre efficacement",
+                "en": "Learn effectively"
+              },
+              "summary": {
+                "fr": "Comparer les techniques d’étude et distinguer familiarité et maîtrise.",
+                "en": "Compare study techniques and distinguish familiarity from mastery."
+              },
+              "durationMinutes": 11,
+              "videos": {
+                "fr": {
+                  "kind": "video",
+                  "language": "fr",
+                  "title": "MIEUX APPRENDRE & ÉTUDIER",
+                  "provider": "ScienceEtonnante",
+                  "youtubeId": "RVB3PBPxMWg",
+                  "url": "https://www.youtube.com/watch?v=RVB3PBPxMWg",
+                  "embedUrl": "https://www.youtube-nocookie.com/embed/RVB3PBPxMWg",
+                  "durationMinutes": 29
+                },
+                "en": {
+                  "kind": "video",
+                  "language": "en",
+                  "title": "Human Behavioral Biology — Introduction",
+                  "provider": "Stanford / Robert Sapolsky",
+                  "youtubeId": "NNnIGh9g6fA",
+                  "url": "https://www.youtube.com/watch?v=NNnIGh9g6fA",
+                  "embedUrl": "https://www.youtube-nocookie.com/embed/NNnIGh9g6fA",
+                  "durationMinutes": 57
+                }
+              }
+            },
+            {
+              "id": "better-questions",
+              "title": {
+                "fr": "Tester un principe moral",
+                "en": "Test a moral principle"
+              },
+              "summary": {
+                "fr": "Faire varier un dilemme pour vérifier la cohérence d’un raisonnement.",
+                "en": "Vary a dilemma to test whether a line of reasoning stays coherent."
+              },
+              "durationMinutes": 12,
+              "videos": {
+                "fr": {
+                  "kind": "video",
+                  "language": "fr",
+                  "title": "Jusqu'où serez-vous utilitariste ?",
+                  "provider": "Monsieur Phi avec Science4All",
+                  "youtubeId": "AZBDMN5wZ-8",
+                  "url": "https://www.youtube.com/watch?v=AZBDMN5wZ-8",
+                  "embedUrl": "https://www.youtube-nocookie.com/embed/AZBDMN5wZ-8",
+                  "durationMinutes": 18
+                },
+                "en": {
+                  "kind": "video",
+                  "language": "en",
+                  "title": "Justice — The Moral Side of Murder",
+                  "provider": "Harvard / Michael Sandel",
+                  "youtubeId": "kBdfcR-8hEY",
+                  "url": "https://www.youtube.com/watch?v=kBdfcR-8hEY",
+                  "embedUrl": "https://www.youtube-nocookie.com/embed/kBdfcR-8hEY",
+                  "durationMinutes": 55
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "decisions",
+          "title": {
+            "fr": "Décisions",
+            "en": "Decisions"
+          },
+          "lessons": [
+            {
+              "id": "evaluate-evidence",
+              "title": {
+                "fr": "Ce qu’une donnée établit",
+                "en": "What data establish"
+              },
+              "summary": {
+                "fr": "Distinguer observation, mécanisme supposé et jugement de valeur.",
+                "en": "Separate observations, proposed mechanisms, and value judgments."
+              },
+              "durationMinutes": 7,
+              "videos": {
+                "fr": {
+                  "kind": "video",
+                  "language": "fr",
+                  "title": "Les Essentiels : qu'est-ce que l'économie ?",
+                  "provider": "Faculté des Sciences économiques et de gestion de Strasbourg",
+                  "youtubeId": "alUdFdpAXEc",
+                  "url": "https://www.youtube.com/watch?v=alUdFdpAXEc",
+                  "embedUrl": "https://www.youtube-nocookie.com/embed/alUdFdpAXEc",
+                  "durationMinutes": 10
+                },
+                "en": {
+                  "kind": "video",
+                  "language": "en",
+                  "title": "The Economy — The Big Idea",
+                  "provider": "CORE Econ / Wendy Carlin",
+                  "youtubeId": "fxxPfvicZPU",
+                  "url": "https://www.youtube.com/watch?v=fxxPfvicZPU",
+                  "embedUrl": "https://www.youtube-nocookie.com/embed/fxxPfvicZPU",
+                  "durationMinutes": 7
+                }
+              }
+            },
+            {
+              "id": "uncertainty",
+              "title": {
+                "fr": "Modéliser pour décider",
+                "en": "Model before deciding"
+              },
+              "summary": {
+                "fr": "Simplifier un phénomène pour produire une prédiction que l’on peut tester.",
+                "en": "Simplify a phenomenon to produce a prediction that can be tested."
+              },
+              "durationMinutes": 13,
+              "videos": {
+                "fr": {
+                  "kind": "video",
+                  "language": "fr",
+                  "title": "Introduction à la mécanique en L1 — cours 1",
+                  "provider": "Richard Taillet",
+                  "youtubeId": "K4XS5biheDI",
+                  "url": "https://www.youtube.com/watch?v=K4XS5biheDI",
+                  "embedUrl": "https://www.youtube-nocookie.com/embed/K4XS5biheDI",
+                  "durationMinutes": 76
+                },
+                "en": {
+                  "kind": "video",
+                  "language": "en",
+                  "title": "The Theoretical Minimum — Classical Mechanics",
+                  "provider": "Stanford / Leonard Susskind",
+                  "youtubeId": "ApUFtLCrU90",
+                  "url": "https://www.youtube.com/watch?v=ApUFtLCrU90",
+                  "embedUrl": "https://www.youtube-nocookie.com/embed/ApUFtLCrU90",
+                  "durationMinutes": 89
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "exercises": [
+    {
+      "id": "change-your-mind",
+      "question": {
+        "fr": "Quel réflexe améliore le plus une décision complexe ?",
+        "en": "Which habit most improves a complex decision?"
+      },
+      "options": [
+        {
+          "id": "a",
+          "label": {
+            "fr": "Chercher uniquement les faits rassurants",
+            "en": "Only look for reassuring facts"
+          }
+        },
+        {
+          "id": "b",
+          "label": {
+            "fr": "Formuler ce qui ferait changer d’avis",
+            "en": "State what would change your mind"
+          }
+        },
+        {
+          "id": "c",
+          "label": {
+            "fr": "Décider plus vite que les autres",
+            "en": "Decide faster than everyone else"
+          }
+        }
+      ],
+      "correctOptionId": "b",
+      "hint": {
+        "fr": "Une bonne méthode permet de réviser honnêtement son jugement.",
+        "en": "A sound method lets you revise your judgment honestly."
+      }
+    }
+  ],
+  "cards": [
+    {
+      "id": "confirmation-bias",
+      "front": {
+        "fr": "Qu’est-ce qu’un biais de confirmation ?",
+        "en": "What is confirmation bias?"
+      },
+      "back": {
+        "fr": "La tendance à privilégier les informations qui confortent une croyance existante.",
+        "en": "The tendency to favor information that supports an existing belief."
+      },
+      "dueAt": "2026-08-10T09:00:00.000Z"
+    },
+    {
+      "id": "falsifiability",
+      "front": {
+        "fr": "Pourquoi demander « qu’est-ce qui me ferait changer d’avis » ?",
+        "en": "Why ask “what would change my mind”?"
+      },
+      "back": {
+        "fr": "Pour rendre une croyance testable et éviter de la protéger contre toute preuve contraire.",
+        "en": "To make a belief testable and avoid shielding it from contrary evidence."
+      },
+      "dueAt": "2026-08-10T09:00:00.000Z"
+    }
+  ],
+  "progress": {
+    "completedLessonIds": [],
+    "passedExerciseIds": [],
+    "recalledCardIds": [],
+    "weeklyLessons": 0,
+    "weeklyReviews": 0
+  }
+}

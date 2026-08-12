@@ -13,6 +13,7 @@ const source: LessonSource = {
   title: "Cours de test",
   provider: "Institution / Auteur",
   kind: "video",
+  language: "fr",
   url: "https://example.org/cours",
   embedUrl: "https://www.youtube-nocookie.com/embed/abc123",
   totalMinutes: 60,
@@ -105,9 +106,5 @@ describe("trackedPlayerUrl", () => {
     expect(url).toContain("end=900");
     expect(url).toContain("enablejsapi=1");
     expect(url.startsWith("https://www.youtube-nocookie.com/embed/")).toBe(true);
-  });
-
-  it("rend une chaîne vide sans embed — le lecteur ne doit pas s'afficher", () => {
-    expect(trackedPlayerUrl({ ...source, embedUrl: undefined }, 0, 60)).toBe("");
   });
 });

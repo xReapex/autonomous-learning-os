@@ -58,7 +58,7 @@ Read SKILL.md and run the setup.
 Your agent will:
 
 1. **Interview you** — what you want to learn, where you're starting from, how much time you actually have.
-2. **Scan your machine** — which of `supabase`, `railway`, `vercel`, `gh`, `codex`, `psql` are installed *and authenticated*.
+2. **Scan your machine** — which of `supabase`, `gh`, `codex`, `psql` are installed *and authenticated*.
 3. **Ask how you want to wire the AI** — Claude Code itself, your local CLI, or your own API key.
 4. **Run the deep research** — parallel sub-agents comb university courses, YouTube channels, open textbooks and papers for your exact subject.
 5. **Write your curriculum** — `app/content/curriculum.json`, validated against a schema.
@@ -192,11 +192,15 @@ No key needed to get it running: the app boots on the shipped curriculum and fil
 
 ## Deploying
 
-| Target | Command | Note |
-|---|---|---|
-| **Vercel** | `cd app && vercel` | Add `DATABASE_URL` if you want progress to persist across devices. |
-| **Railway** | `cd app && railway up` | Postgres provisioned in one click, `DATABASE_URL` injected. |
-| **Local only** | `npm run build && npm start` | File storage in `app/.data/`, nothing leaves your machine. |
+The runtime curriculum editor is fail-closed and must not be exposed through an
+unprotected `next start` or direct serverless application deployment. Production
+requires an authenticated reverse proxy, a loopback-only Next.js service,
+server-side `APP_URL` and a proxy-injected mutation secret. See the auditable
+Nginx/systemd templates in [`deploy/`](deploy/).
+
+A direct local start remains suitable for development and read-only use; runtime
+curriculum PUT/DELETE intentionally return `403` until the authenticated proxy
+boundary is installed.
 
 ---
 

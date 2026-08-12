@@ -30,3 +30,13 @@ app/public/wallpapers/*
 .DS_Store
 *.log
 .vercel/
+
+# Rapports, captures et bundles de validation générés localement
+artifacts/
+audit-store-sources/
+
+# Ancienne expérimentation Capacitor — le client retenu est Expo
+app/android/
+app/ios/
+app/mobile-shell/
+app/capacitor.config.ts

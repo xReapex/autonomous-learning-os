@@ -14,7 +14,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { LessonSource } from "@/lib/curriculum";
-import { formatClock, formatDateTime } from "@/lib/format";
+import { formatClock } from "@/lib/format";
+import type { RewardGrant } from "@/lib/rewards";
+import { useLocale } from "./locale-context";
+import { useRewards } from "./rewards-context";
 import { Status } from "./window";
 import {
   getResumableSegment,
@@ -38,6 +41,8 @@ export function TrackedVideo({
   availableMinutes: number;
   title: string;
 }) {
+  const { t, formatDateTime } = useLocale();
+  const { recordGrant } = useRewards();
   const [loaded, setLoaded] = useState(false);
   const [progress, setProgress] = useState<LessonProgress>(() => normalizeLessonProgress(null, lessonId, source.url));
   const [resumePosition, setResumePosition] = useState(0);
@@ -52,6 +57,7 @@ export function TrackedVideo({
   const durationRef = useRef(durationSeconds);
   const completedRef = useRef(false);
   const lastSavedRef = useRef(-1);
+  const lastSavedCompletedRef = useRef(false);
 
   const segment = useMemo(
     () => getResumableSegment(source, availableMinutes, resumePosition),
@@ -75,6 +81,7 @@ export function TrackedVideo({
         durationRef.current = next.durationSeconds;
         completedRef.current = next.completed;
         lastSavedRef.current = next.positionSeconds;
+        lastSavedCompletedRef.current = next.completed;
         setSaveStatus(response.ok || response.status === 404 ? "ready" : "offline");
       } catch {
         if (active) setSaveStatus("offline");
@@ -89,9 +96,13 @@ export function TrackedVideo({
   const persist = useCallback(async (markCompleted = completedRef.current, force = false) => {
     const position = Math.max(0, Math.floor(positionRef.current));
     const duration = Math.max(0, Math.floor(durationRef.current));
+    const completionChanged = markCompleted !== lastSavedCompletedRef.current;
+    // Un démontage ou un passage en arrière-plan ne doit jamais matérialiser
+    // une progression vierge si le lecteur n'a observé aucun changement.
+    if (position === lastSavedRef.current && !completionChanged) return;
     // Moins de 2 s d'écart, rien de neuf à écrire : inutile de solliciter le
     // stockage toutes les 5 secondes sur une vidéo en pause.
-    if (!force && !markCompleted && Math.abs(position - lastSavedRef.current) < 2) return;
+    if (!force && !completionChanged && Math.abs(position - lastSavedRef.current) < 2) return;
 
     setSaveStatus("saving");
     try {
@@ -107,15 +118,18 @@ export function TrackedVideo({
         keepalive: true,
       });
       if (!response.ok) throw new Error("Sauvegarde refusée");
-      const next = normalizeLessonProgress(await response.json(), lessonId, source.url);
+      const body = await response.json() as LessonProgress & { reward?: RewardGrant | null };
+      const next = normalizeLessonProgress(body, lessonId, source.url);
+      recordGrant(body.reward);
       completedRef.current = next.completed;
       lastSavedRef.current = next.positionSeconds;
+      lastSavedCompletedRef.current = next.completed;
       setProgress(next);
       setSaveStatus("saved");
     } catch {
       setSaveStatus("offline");
     }
-  }, [lessonId, source.url]);
+  }, [lessonId, recordGrant, source.url]);
 
   const command = useCallback((func: string, args: unknown[] = []) => {
     if (!source.embedUrl) return;
@@ -177,28 +191,17 @@ export function TrackedVideo({
     };
   }, [command, loaded, persist, segment.endSeconds]);
 
-  if (!source.embedUrl) {
-    return (
-      <div className="bx-reading">
-        <p className="bx-muted">Cette capsule est une lecture guidée.</p>
-        <strong>{source.segmentLabel}</strong>
-        <a className="bx-link" href={source.url} target="_blank" rel="noreferrer">
-          Ouvrir la ressource officielle
-        </a>
-      </div>
-    );
-  }
 
   if (!loaded) {
-    return <div className="bx-loader" role="status">Chargement de ta reprise…</div>;
+    return <div className="bx-loader" role="status">{t("video.loadingResume")}</div>;
   }
 
   const fullDuration = durationSeconds || (source.totalMinutes ? source.totalMinutes * 60 : segment.endSeconds);
   const watchedPercent = fullDuration ? Math.min(100, Math.round((positionSeconds / fullDuration) * 100)) : 0;
   const statusCopy =
-    saveStatus === "saving" ? "Sauvegarde…"
-    : saveStatus === "offline" ? "Sauvegarde hors ligne"
-    : `Sauvegardé à ${formatClock(positionSeconds)}`;
+    saveStatus === "saving" ? t("video.saving")
+    : saveStatus === "offline" ? t("video.offline")
+    : t("video.savedAt", { time: formatClock(positionSeconds) });
 
   return (
     <div>
@@ -206,7 +209,7 @@ export function TrackedVideo({
         <iframe
           ref={iframeRef}
           src={trackedPlayerUrl(source, segment.startSeconds, segment.endSeconds)}
-          title={`${title} — segment ${segment.startLabel} à ${segment.endLabel}`}
+          title={t("video.segmentTitle", { title, start: segment.startLabel, end: segment.endLabel })}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
           onLoad={connect}
@@ -217,33 +220,29 @@ export function TrackedVideo({
         <div className="bx-between">
           <strong>
             {progress.completed
-              ? "Leçon terminée"
+              ? t("video.completed")
               : positionSeconds > 0
-                ? `Reprise à ${formatClock(positionSeconds)}`
-                : "Progression automatique activée"}
+                ? t("video.resume", { time: formatClock(positionSeconds) })
+                : t("video.autoProgress")}
           </strong>
           <Status on={saveStatus !== "offline"}>{statusCopy}</Status>
         </div>
 
-        <div className="bx-meter" aria-label={`${watchedPercent} % de la vidéo consultée`}>
+        <div className="bx-meter" aria-label={t("video.watched", { progress: watchedPercent })}>
           <span style={{ width: `${watchedPercent}%` }} />
         </div>
 
         <div className="bx-between">
           <small>
-            Capsule · {segment.startLabel} → {segment.endLabel} · vu {formatClock(positionSeconds)} / {formatClock(fullDuration)}
+            {t("video.capsuleProgress", { start: segment.startLabel, end: segment.endLabel, watched: formatClock(positionSeconds), total: formatClock(fullDuration) })}
           </small>
-          {progress.completed ? (
-            <Status on>Terminé</Status>
-          ) : (
-            <button type="button" className="bx-btn" onClick={() => void persist(true, true)}>
-              Marquer terminé
-            </button>
-          )}
+          {progress.completed
+            ? <Status on>{t("video.completed")}</Status>
+            : <Status on={false}>{t("video.watchToComplete")}</Status>}
         </div>
 
         {progress.lastWatchedAt ? (
-          <small>Dernière consultation · {formatDateTime(progress.lastWatchedAt)}</small>
+          <small>{t("video.lastViewed", { date: formatDateTime(progress.lastWatchedAt) })}</small>
         ) : null}
       </div>
     </div>

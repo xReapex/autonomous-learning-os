@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { dailyCards } from "@/lib/curriculum";
+import { normalizeCurriculumDocument } from "@/lib/curriculum";
+import { loadActiveCurriculum } from "@/lib/curriculum-store";
 import { dueCards, newCardState } from "@/lib/scheduler";
 import { getStorage } from "@/lib/storage";
 import { buildDailyBrief, sendTelegramMessage, telegramConfig } from "@/lib/telegram";
@@ -35,6 +36,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const active = await loadActiveCurriculum();
+  const curriculum = normalizeCurriculumDocument(active.document);
+  const dailyCards = curriculum.cards;
   const stored = await getStorage().getCardStates();
   const byId = new Map(stored.map((state) => [state.cardId, state]));
   const states = dailyCards.map((card) => byId.get(card.id) ?? newCardState(card.id));
@@ -44,7 +48,7 @@ export async function POST(request: Request) {
   // jours.
   const dayIndex = Math.floor(Date.now() / 86_400_000);
 
-  const text = buildDailyBrief({ subjectIndex: dayIndex, dueCards: dueCards(states).length });
+  const text = buildDailyBrief(curriculum, { subjectIndex: dayIndex, dueCards: dueCards(states).length });
   const result = await sendTelegramMessage(text);
 
   if (!result.sent) return NextResponse.json({ error: result.error }, { status: 502 });

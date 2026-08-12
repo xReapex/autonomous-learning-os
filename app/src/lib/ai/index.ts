@@ -21,8 +21,18 @@ export type AiOutcome =
   | { status: "failed"; error: string; provider: AiProvider };
 
 export function currentProvider(): AiProvider {
+  // Public deployments run behind a shared HTTP surface. In this mode, never
+  // let environment drift enable a local CLI or a billable API call.
+  if (process.env.HOSTED_SAFE_MODE === "true") return "claude-code";
   const value = (process.env.AI_PROVIDER || "claude-code").toLowerCase();
   return value === "cli" || value === "api" ? value : "claude-code";
+}
+
+export function automaticAiAllowedForCurriculum(
+  source: "delivered" | "override",
+  provider: AiProvider,
+): boolean {
+  return provider === "claude-code" || source === "delivered" || process.env.ALLOW_RUNTIME_CURRICULUM_AI === "true";
 }
 
 export function providerLabel(provider: AiProvider): string {
@@ -55,7 +65,7 @@ function runViaCli(prompt: string): Promise<AiOutcome> {
   const args = bin === "codex" ? ["exec", "--"] : ["-p"];
 
   return new Promise((resolve) => {
-    const child = spawn(bin, args, {
+    const child = spawn(/* turbopackIgnore: true */ bin, args, {
       stdio: ["pipe", "pipe", "pipe"],
       // Le prompt part par stdin, pas en argument : il contient la réponse de
       // l'apprenant, et les arguments de processus sont visibles par `ps`.

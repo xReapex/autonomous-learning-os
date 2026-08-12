@@ -4,7 +4,7 @@
 // .env.local et ne quittent jamais sa machine. Sans configuration, tout est
 // silencieusement désactivé — aucune erreur, aucun appel réseau.
 
-import { curriculum, subjects } from "./curriculum";
+import type { Curriculum } from "./curriculum";
 import { formatMinutes } from "./format";
 
 export type TelegramConfig = { token: string; chatId: string };
@@ -50,12 +50,12 @@ export async function sendTelegramMessage(text: string): Promise<{ sent: boolean
  * Volontairement déterministe : pas d'appel à un modèle pour envoyer un
  * message, sinon un cron quotidien devient une dépendance payante.
  */
-export function buildDailyBrief(options: {
+export function buildDailyBrief(curriculum: Curriculum, options: {
   subjectIndex?: number;
   dueCards: number;
   appUrl?: string;
 }): string {
-  const subject = subjects[(options.subjectIndex ?? 0) % subjects.length];
+  const subject = curriculum.subjects[(options.subjectIndex ?? 0) % curriculum.subjects.length];
   const lesson = subject.lesson;
   const source = lesson.source;
   const url = options.appUrl || process.env.APP_URL || "http://localhost:3000";

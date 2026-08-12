@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { resolve } from "node:path";
 
 // En-têtes de sécurité appliqués à toute l'app.
 //
@@ -32,6 +33,9 @@ const CSP = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  turbopack: {
+    root: resolve(process.cwd(), ".."),
+  },
   async headers() {
     return [
       {

@@ -89,30 +89,16 @@ Le chemin absolu vers `npm` est nécessaire : cron n'hérite pas de ton `PATH`.
 launchctl load ~/Library/LaunchAgents/com.bizos.learning-brief.plist
 ```
 
-### Sur Vercel
+### Instance hébergée sécurisée
 
-`app/vercel.json` :
+Le profil de production fourni dans [`deploy/`](../deploy/) désactive Telegram et
+renvoie `404` sur `/api/telegram`. Ne configure pas de cron serverless direct :
+il contournerait la frontière Nginx/systemd obligatoire pour cette application.
 
-```json
-{
-  "crons": [{ "path": "/api/telegram", "schedule": "0 8 * * *" }]
-}
-```
-
-Vercel n'envoie que des GET sur les crons alors que la route attend un POST :
-ajoute une petite fonction relais, ou utilise plutôt un cron externe qui fait le
-POST avec le header d'autorisation.
-
-**Sur une app déployée, `CRON_SECRET` est obligatoire.** Sans lui, la route
-`/api/telegram` est publique et n'importe qui peut déclencher des envois vers ton
-compte.
-
-```bash
-# une valeur aléatoire, dans les variables d'environnement Vercel
-openssl rand -hex 32
-```
-
-L'appelant doit alors envoyer `Authorization: Bearer <CRON_SECRET>`.
+Si tu conçois volontairement un autre profil hébergé avec Telegram, il doit faire
+l’objet d’une revue séparée, conserver l’authentification globale du proxy et
+protéger la route avec un `CRON_SECRET` serveur. Ce scénario n’est pas couvert
+par le contrat de déploiement livré ici.
 
 ---
 
@@ -163,7 +149,6 @@ Sache que ça transforme un cron gratuit en cron facturé.
 | Envoi 403 | Tu as bloqué le bot | Débloque-le dans Telegram |
 | Envoi 400 « chat not found » | Chat ID d'un groupe dont le bot est sorti | Réinvite le bot, ou repasse en conversation directe |
 | Rien à 8 h avec cron | `PATH` incomplet | Chemin absolu vers `npm` dans la crontab |
-| Rien à 8 h sur Vercel | Cron GET vs route POST | Voir la section Vercel |
 
 Pour envoyer un brief à la demande et voir l'erreur exacte :
 

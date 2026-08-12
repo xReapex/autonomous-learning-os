@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { allLessons, curriculum, lessonById, sourceAudit, subjectById, subjects } from "./curriculum";
+import {
+  allLessons,
+  curriculum,
+  defaultCurriculumDocument,
+  lessonById,
+  normalizeCurriculumDocument,
+  sourceAudit,
+  subjectById,
+  subjects,
+} from "./curriculum";
 
 describe("curriculum livré", () => {
   it("expose un sujet et un objectif exploitables", () => {
@@ -66,6 +75,16 @@ describe("curriculum livré", () => {
 });
 
 describe("accès au curriculum", () => {
+  it("conserve la version et accepte un document injecté", () => {
+    expect(defaultCurriculumDocument.version).toBe(1);
+    const document = structuredClone(defaultCurriculumDocument);
+    document.subjects[0].id = "matiere-runtime";
+    const runtime = normalizeCurriculumDocument(document);
+
+    expect(subjectById("matiere-runtime", runtime).id).toBe("matiere-runtime");
+    expect(allLessons(runtime).length).toBeGreaterThan(0);
+  });
+
   it("retombe sur la première matière pour un id inconnu", () => {
     expect(subjectById("n-existe-pas").id).toBe(subjects[0].id);
   });

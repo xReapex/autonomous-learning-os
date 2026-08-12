@@ -12,6 +12,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { validateVideoSources } from "../worker/source-contract.mjs";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const schemaPath = resolve(root, "research/curriculum.schema.json");
 const target = process.argv[2]
@@ -108,6 +110,8 @@ function businessRules(doc) {
   const subjectIds = new Set();
   const lessonIds = new Set();
   const today = new Date().toISOString().slice(0, 10);
+
+  for (const error of validateVideoSources(doc)) fail("videoSources", error);
 
   for (const [si, subject] of (doc.subjects ?? []).entries()) {
     const sPath = `subjects[${si}]`;

@@ -16,16 +16,10 @@ import { randomUUID } from "node:crypto";
 
 import type { CardState } from "@/lib/scheduler";
 import type { LessonProgress } from "@/lib/lesson-progress";
+import { applyRewardEvent, duplicateRewardGrant, normalizeRewardState, type RewardEvent, type RewardState } from "@/lib/rewards";
 import type { Storage, StoredAnswer } from "./types";
 
-const DATA_DIR = process.env.LEARNING_DATA_DIR || join(process.cwd(), ".data");
-
-const FILES = {
-  progress: join(DATA_DIR, "progress.json"),
-  cards: join(DATA_DIR, "cards.json"),
-  notes: join(DATA_DIR, "notes.json"),
-  answers: join(DATA_DIR, "answers.json"),
-} as const;
+type StoredRewards = { state: RewardState; eventIds: string[] };
 
 // Une chaîne de promesses par fichier : chaque écriture attend la précédente.
 const writeQueues = new Map<string, Promise<unknown>>();
@@ -59,78 +53,113 @@ async function writeJson(file: string, value: unknown) {
   await rename(temporary, file);
 }
 
-export function createFileStorage(): Storage {
+export function createFileStorage(dataDirectory = process.env.LEARNING_DATA_DIR || join(process.cwd(), ".data")): Storage {
+  const files = {
+    progress: join(dataDirectory, "progress.json"),
+    cards: join(dataDirectory, "cards.json"),
+    notes: join(dataDirectory, "notes.json"),
+    answers: join(dataDirectory, "answers.json"),
+    rewards: join(dataDirectory, "rewards.json"),
+  } as const;
+
   return {
     driver: "file",
 
     async getProgress(lessonId) {
-      const all = await readJson<Record<string, LessonProgress>>(FILES.progress, {});
+      const all = await readJson<Record<string, LessonProgress>>(files.progress, {});
       return all[lessonId] ?? null;
     },
 
     async saveProgress(progress) {
-      return enqueue(FILES.progress, async () => {
-        const all = await readJson<Record<string, LessonProgress>>(FILES.progress, {});
+      return enqueue(files.progress, async () => {
+        const all = await readJson<Record<string, LessonProgress>>(files.progress, {});
         all[progress.lessonId] = progress;
-        await writeJson(FILES.progress, all);
+        await writeJson(files.progress, all);
         return progress;
       });
     },
 
     async listProgress() {
-      const all = await readJson<Record<string, LessonProgress>>(FILES.progress, {});
+      const all = await readJson<Record<string, LessonProgress>>(files.progress, {});
       return Object.values(all);
     },
 
     async getCardStates() {
-      const all = await readJson<Record<string, CardState>>(FILES.cards, {});
+      const all = await readJson<Record<string, CardState>>(files.cards, {});
       return Object.values(all);
     },
 
     async saveCardState(state) {
-      return enqueue(FILES.cards, async () => {
-        const all = await readJson<Record<string, CardState>>(FILES.cards, {});
+      return enqueue(files.cards, async () => {
+        const all = await readJson<Record<string, CardState>>(files.cards, {});
         all[state.cardId] = state;
-        await writeJson(FILES.cards, all);
+        await writeJson(files.cards, all);
         return state;
       });
     },
 
     async getNote(subjectId) {
-      const all = await readJson<Record<string, string>>(FILES.notes, {});
+      const all = await readJson<Record<string, string>>(files.notes, {});
       return all[subjectId] ?? "";
     },
 
     async saveNote(subjectId, body) {
-      await enqueue(FILES.notes, async () => {
-        const all = await readJson<Record<string, string>>(FILES.notes, {});
+      await enqueue(files.notes, async () => {
+        const all = await readJson<Record<string, string>>(files.notes, {});
         all[subjectId] = body;
-        await writeJson(FILES.notes, all);
+        await writeJson(files.notes, all);
       });
     },
 
     async listNotes() {
-      return readJson<Record<string, string>>(FILES.notes, {});
+      return readJson<Record<string, string>>(files.notes, {});
     },
 
     async appendAnswer(answer) {
-      return enqueue(FILES.answers, async () => {
-        const all = await readJson<StoredAnswer[]>(FILES.answers, []);
+      return enqueue(files.answers, async () => {
+        const all = await readJson<StoredAnswer[]>(files.answers, []);
+        const existing = all.find((item) => item.id === answer.id);
+        if (existing) return existing;
         all.push(answer);
         // On garde les 500 dernières : un historique d'exercices n'a pas
         // vocation à grossir indéfiniment dans un fichier relu à chaque écriture.
-        await writeJson(FILES.answers, all.slice(-500));
+        await writeJson(files.answers, all.slice(-500));
         return answer;
       });
     },
 
     async listAnswers(limit = 50) {
-      const all = await readJson<StoredAnswer[]>(FILES.answers, []);
+      const all = await readJson<StoredAnswer[]>(files.answers, []);
       return all.slice(-limit).reverse();
     },
 
+    async getRewardState() {
+      const stored = await readJson<StoredRewards | null>(files.rewards, null);
+      return normalizeRewardState(stored?.state);
+    },
+
+    async awardReward(event: RewardEvent) {
+      return enqueue(files.rewards, async () => {
+        const stored = await readJson<StoredRewards | null>(files.rewards, null);
+        const state = normalizeRewardState(stored?.state);
+        const eventIds = Array.isArray(stored?.eventIds) ? stored.eventIds.filter((id): id is string => typeof id === "string") : [];
+        if (eventIds.includes(event.eventId)) return duplicateRewardGrant(event, state);
+
+        const applied = applyRewardEvent(state, event);
+        await writeJson(files.rewards, { state: applied.state, eventIds: [...eventIds, event.eventId] } satisfies StoredRewards);
+        return {
+          eventId: event.eventId,
+          kind: event.kind,
+          awarded: true,
+          reward: applied.reward,
+          tierUnlocked: applied.tierUnlocked,
+          state: applied.state,
+        };
+      });
+    },
+
     async ping() {
-      await mkdir(DATA_DIR, { recursive: true });
+      await mkdir(dataDirectory, { recursive: true });
       return true;
     },
   };

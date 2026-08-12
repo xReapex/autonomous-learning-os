@@ -29,7 +29,7 @@ Le script écrit `.setup/stack.json` et affiche un résumé. Il détecte :
 
 - les runtimes : `node`, `npm`, `python3`
 - les CLIs de données : `supabase`, `railway`, `psql`, `neonctl` — **et si elles sont authentifiées**
-- les CLIs de déploiement : `vercel`, `gh`
+- la CLI de dépôt : `gh`
 - les CLIs d'IA : `claude`, `codex`
 - les variables d'environnement d'API déjà présentes dans le shell
 
@@ -240,7 +240,7 @@ Dis à l'utilisateur, en clair et court :
    et la plus forte selon toi.
 3. **Ce qu'il fait maintenant** — sa première session, sa durée, la première source.
 4. **Ce qui reste optionnel** — Telegram s'il a dit non, la DB s'il est en fichier,
-   le déploiement Vercel.
+   et le déploiement sécurisé décrit dans `deploy/`.
 5. **Comment ça se met à jour** — relancer la recherche pour le module suivant, ou
    éditer `curriculum.json` à la main.
 

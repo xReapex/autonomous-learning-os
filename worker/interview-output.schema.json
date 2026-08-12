@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "phase",
+    "questionTopic",
+    "message",
+    "choices",
+    "progress",
+    "document"
+  ],
+  "properties": {
+    "phase": {
+      "type": "string",
+      "enum": [
+        "question",
+        "confirmation",
+        "proposal"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "choices": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 160
+      }
+    },
+    "progress": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "document": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/curriculum"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "questionTopic": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "subject",
+            "current_method",
+            "level",
+            "goal",
+            "availability",
+            "horizon",
+            "format",
+            "constraints"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "subject": {
+      "type": "object",
+      "required": [
+        "id",
+        "icon",
+        "title",
+        "level",
+        "progress",
+        "lessons"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{2,40}$"
+        },
+        "icon": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2,
+          "description": "Un glyphe monospace (↗ ◌ ◐ ✦ ⌁ △ ≋ ✣ ◇ ◎). Jamais un emoji couleur : ça casse le rendu du bureau."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300
+        },
+        "level": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Sous-titre libre : 'Fondations · débutant'."
+        },
+        "progress": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "lessons": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/lesson"
+          },
+          "maxItems": 4
+        }
+      }
+    },
+    "lesson": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "objective",
+        "keyTakeaways",
+        "prompt",
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{3,60}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 300
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2000,
+          "description": "Ce que l'apprenant doit pouvoir faire après. Un verbe d'action, pas 'découvrir'."
+        },
+        "keyTakeaways": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          }
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 5000,
+          "description": "L'exercice de transfert. Doit demander une application, pas une définition."
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "title",
+        "provider",
+        "kind",
+        "language",
+        "url",
+        "embedUrl",
+        "totalMinutes",
+        "minutes",
+        "why",
+        "access",
+        "accessNote",
+        "verifiedAt",
+        "segmentLabel"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 500,
+          "description": "Titre exact, dans sa langue d'origine."
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300,
+          "description": "Institution / auteur. 'Stanford / Leonard Susskind'."
+        },
+        "kind": {
+          "type": "string",
+          "const": "video"
+        },
+        "language": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 12,
+          "description": "Langue parlée dans la vidéo. Doit correspondre à la langue du curriculum."
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://(www\\.|m\\.)?youtube\\.com/(watch\\?v=|shorts/|live/)|^https://youtu\\.be/",
+          "maxLength": 2048
+        },
+        "embedUrl": {
+          "type": "string",
+          "pattern": "^https://www\\.youtube-nocookie\\.com/embed/",
+          "maxLength": 2048
+        },
+        "totalMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10080
+        },
+        "minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "La capsule à regarder aujourd'hui. C'est le cœur du produit : jamais le cours entier par défaut."
+        },
+        "why": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 3000,
+          "description": "Pourquoi CETTE source pour CETTE notion à CE niveau. 'C'est un bon cours' est refusé."
+        },
+        "access": {
+          "const": "free",
+          "type": "string"
+        },
+        "accessNote": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2000,
+          "description": "Comment on y accède gratuitement, et ce qui est payant mais optionnel."
+        },
+        "verifiedAt": {
+          "type": "string",
+          "description": "Date où le lien a été ouvert et confirmé. Pas d'estimation."
+        },
+        "segmentLabel": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 1000,
+          "description": "Ce que couvre le segment. 'Lecture 8, chapitre 3 : valeur actualisée'."
+        }
+      }
+    },
+    "card": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "front",
+        "back",
+        "subjectId",
+        "lessonId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{2,40}$"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Catégorie affichée : 'Modèle mental', 'Définition'…"
+        },
+        "front": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2000,
+          "description": "Une question récupérable. Pas un titre."
+        },
+        "back": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 5000
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{2,40}$"
+        },
+        "lessonId": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{3,60}$"
+        }
+      }
+    },
+    "curriculum": {
+      "type": "object",
+      "required": [
+        "version",
+        "subject",
+        "goal",
+        "level",
+        "sessionMinutes",
+        "generatedAt",
+        "language",
+        "subjects",
+        "cards"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1,
+          "description": "Version du format. Incrémentée seulement sur rupture.",
+          "type": "integer"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200,
+          "description": "Le sujet tel que l'utilisateur l'a formulé, affiché sous le wordmark."
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2000,
+          "description": "Le résultat vérifiable visé. Doit être observable, pas 'comprendre X'."
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "debutant",
+            "intermediaire",
+            "avance"
+          ]
+        },
+        "sessionMinutes": {
+          "type": "integer",
+          "enum": [
+            15,
+            30,
+            45,
+            60,
+            90,
+            120,
+            180
+          ]
+        },
+        "generatedAt": {
+          "type": "string",
+          "description": "Date de génération. Sert à repérer un curriculum qui vieillit."
+        },
+        "language": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 12
+        },
+        "subjects": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Les matières. Aucun plafond : c'est le choix de l'apprenant. 3 à 5 actives est ce qui tient le mieux dans la durée, au-delà la file de révision se dilue — le validateur le recommande, il ne l'impose pas.",
+          "items": {
+            "$ref": "#/$defs/subject"
+          },
+          "maxItems": 4
+        },
+        "cards": {
+          "type": "array",
+          "minItems": 3,
+          "description": "Les cartes de révision espacée initiales.",
+          "items": {
+            "$ref": "#/$defs/card"
+          },
+          "maxItems": 48
+        }
+      }
+    }
+  }
+}

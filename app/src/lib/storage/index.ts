@@ -36,3 +36,4 @@ export function getStorage(): Storage {
 }
 
 export type { Storage, StoredAnswer } from "./types";
+export type { RewardEvent, RewardGrant, RewardState } from "@/lib/rewards";

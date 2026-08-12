@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { subjects } from "@/lib/curriculum";
+import { loadActiveCurriculum } from "@/lib/curriculum-store";
 import { getStorage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const subjects = (await loadActiveCurriculum()).document.subjects;
   let body: { subjectId?: unknown; body?: unknown };
   try {
     body = await request.json();

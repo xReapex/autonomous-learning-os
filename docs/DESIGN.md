@@ -1,211 +1,176 @@
-# Le design — BizOS × Learning
-
-L'app suit l'**UX BizOS V9**, la version en production sur
-[bizos.cc](https://bizos.cc) : un wallpaper occupe tout l'écran, des panneaux
-blancs stricts flottent dessus avec une ombre dure, et tout est écrit en
-**Inria Serif**.
-
-La référence est le brief V9 du dépôt `bizos-saas` (branche `main`,
-`docs/design/BRIEF-DASHBOARD-BIZOS-V9.md`). L'ancien « Desktop OS » crème et
-violet, tout en monospace, appartient au passé — si vous trouvez encore un
-`#8b6df0` quelque part, c'est un reliquat à supprimer.
-
+---
+version: alpha
+name: SCIO
+description: Une interface d'apprentissage calme, tactile et éditoriale pour progresser avec précision.
+colors:
+  primary: "#17221C"
+  secondary: "#667069"
+  tertiary: "#C44329"
+  neutral: "#F4F1E9"
+  surface: "#FFFEFA"
+  surfaceMuted: "#ECEFEA"
+  border: "#D9DDD7"
+  textInverse: "#FFFFFF"
+  danger: "#A22C23"
+typography:
+  display:
+    fontFamily: Newsreader
+    fontSize: 2rem
+    fontWeight: 600
+    lineHeight: 1.08
+    letterSpacing: "-0.025em"
+  heading:
+    fontFamily: Manrope
+    fontSize: 1.25rem
+    fontWeight: 700
+    lineHeight: 1.2
+    letterSpacing: "-0.015em"
+  body:
+    fontFamily: Manrope
+    fontSize: 1rem
+    fontWeight: 400
+    lineHeight: 1.55
+  label:
+    fontFamily: Manrope
+    fontSize: 0.75rem
+    fontWeight: 700
+    lineHeight: 1.2
+    letterSpacing: "0.02em"
+rounded:
+  sm: 10px
+  md: 16px
+  lg: 22px
+spacing:
+  xs: 4px
+  sm: 8px
+  md: 16px
+  lg: 24px
+  xl: 32px
+components:
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.textInverse}"
+    rounded: "{rounded.md}"
+    height: 48px
+    padding: 16px
+  button-primary-hover:
+    backgroundColor: "{colors.tertiary}"
+    textColor: "{colors.textInverse}"
+  card:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.primary}"
+    rounded: "{rounded.lg}"
+    padding: 20px
+  tab-active:
+    backgroundColor: "{colors.surfaceMuted}"
+    textColor: "{colors.primary}"
+    rounded: "{rounded.md}"
+  app-shell:
+    backgroundColor: "{colors.neutral}"
+    textColor: "{colors.primary}"
+  divider:
+    backgroundColor: "{colors.border}"
+    size: 1px
+  error-text:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.danger}"
 ---
 
-## Les règles qui ne se négocient pas
+# Overview
 
-1. **Une seule grammaire visuelle : noir, blanc, gris.** Aucune teinte d'accent.
-   Le statut ne repose jamais sur la couleur seule — il s'écrit en toutes lettres.
-2. **Inria Serif est la voix du produit.** La monospace se limite aux durées,
-   compteurs et identifiants ; elle n'est jamais la voix générale.
-3. **L'interface reste carrée.** `--radius: 0`, aucune pilule, aucune lueur,
-   aucun dégradé.
-4. **L'ombre appartient aux fenêtres, pas aux contrôles.** `5px 5px 0`, dirigée
-   en bas à droite, sans flou. **Les boutons sont plats.**
-5. **Au survol, les couleurs s'inversent — rien ne bouge.** Pas de `translate`,
-   pas d'ombre ajoutée.
-6. **Le titre de section n'a jamais de trait en dessous.**
+**SCIO** associe la chaleur d’un carnet de travail à la précision d’un système de progression. L’identité est directe : le wordmark, le monogramme et les métadonnées disent SCIO, sans sous-marque parallèle. L’interface ne reproduit ni Linear, ni Notion, ni le bureau BizOS V9 historique.
 
----
+La priorité est l'action d'apprentissage suivante. Chaque écran doit répondre immédiatement à une question : continuer, pratiquer, réviser ou régler.
 
-## La palette
+# Colors
 
-| Token | Valeur | Usage |
-|---|---|---|
-| `--ink` | `#111111` | Encre, traits, remplissages actifs |
-| `--paper` | `#ffffff` | Fond des cartes |
-| `--canvas` | `#e8e8e6` | Le gris de l'espace, sous le wallpaper |
-| `--grey-600` | `#6b6b6b` | Métadonnées, texte secondaire |
-| `--grey-400` | `#9a9a9a` | Placeholders |
-| `--grey-200` | `#d9d9d9` | Traits fins, états désactivés |
-| `--grey-100` | `#efefee` | Fonds de champ, séparateurs de lignes |
+La palette est principalement ivoire et encre forestière. Le corail est un signal d'action rare, jamais un remplissage décoratif généralisé.
 
-C'est tout. Il n'y a pas de token d'accent, et il ne faut pas en ajouter.
+- **Encre (`primary`)** : texte, boutons principaux et navigation active.
+- **Ivoire (`neutral`)** : fond continu de l'application.
+- **Papier (`surface`)** : surfaces de travail.
+- **Corail (`tertiary`)** : progression et action ponctuelle.
+- Les statuts restent toujours écrits ; la couleur seule ne porte aucune information.
 
-**Sur un fond sombre**, `data-surface="dark"` inverse **uniquement la chrome
-posée directement sur le wallpaper** — wordmark, sous-titre, barre basse. Les
-cartes ne changent jamais : blanches, texte noir, trait noir. Le fond apporte le
-monde, les panneaux restent stricts.
+# Typography
 
----
+- **Newsreader** est réservée aux titres de leçon et aux moments éditoriaux.
+- **Manrope** porte toute l'interface, les boutons et le corps.
+- Les polices sont auto-hébergées via `next/font`; aucun appel Google n'est effectué au runtime.
+- Les capitales espacées ne sont pas une voix générale.
 
-## La typographie
+# Layout
 
-```css
---serif: var(--font-inria), Georgia, "Times New Roman", serif;   /* la voix */
---sans:  var(--font-lexend), "Helvetica Neue", Arial, sans-serif; /* microcopies */
---mono:  ui-monospace, "SF Mono", Menlo, "Courier New", monospace; /* chiffres */
-```
+## Mobile
 
-Les deux polices viennent de `next/font/google` : elles sont téléchargées au
-build puis **auto-hébergées**, donc aucun appel à Google au runtime. Georgia est
-un repli très proche si le build se fait hors ligne.
+- En-tête compact dans le flux, sans faux bureau ni wallpaper.
+- Une colonne, marges de 16 px.
+- Barre de cinq onglets fixe en bas avec icône, texte et safe-area iOS.
+- Chaque cible principale mesure au moins 44 × 44 px.
+- Une seule action principale par surface.
 
-| Rôle | Traitement |
-|---|---|
-| Titre de section | Inria Serif, `1.3rem`, gras, casse normale, tracking normal |
-| Titre de page | Inria Serif, `1.65rem`, gras |
-| Corps | Inria Serif, `0.85–0.9rem` |
-| Libellés, métadonnées, boutons | Lexend, `0.6–0.68rem`, majuscules, `letter-spacing` `0.12em` |
-| Chrono, durées, index | Mono |
+## Desktop
 
-Pas de capitales espacées sur toutes les microcopies : uniquement sur les
-libellés et les actions.
+- Barre latérale de 232 px avec la même navigation.
+- Contenu centré, largeur maximale de 1180 px.
+- Grille asymétrique 2/1 pour garder la tâche principale dominante.
+- La barre mobile n'est jamais rendue visuellement sur desktop.
 
----
+# Elevation & Depth
 
-## La carte
+Les surfaces se distinguent par une bordure claire et une légère variation de fond. Pas d'ombre dure, pas de fausse fenêtre flottante, pas de wallpaper visible derrière des panneaux.
 
-```
-┌─────────────────────────────────────┐╲
-│ ■ Titre de section         contexte │ ╲  ombre dure 5px 5px 0
-│                                     │  │  dirigée, sans flou
-│   contenu                           │  │
-│                                     │  │
-└─────────────────────────────────────┘  │
- ╲_________________________________________╲
-```
+# Shapes
 
-- Fond **blanc**, trait **1 px** noir, coins carrés, `padding: 12px 14px`.
-- L'en-tête est **un carré noir de 9 px** suivi du titre en serif. **Aucun trait,
-  aucun bord, aucun séparateur en dessous.**
-- Une section sans action à droite garde exactement la même hauteur et le même
-  alignement qu'une section avec actions.
-- Aucun bandeau noir décoratif, aucune carte dans une carte sans raison
-  fonctionnelle.
+Les rayons de 10, 16 et 22 px forment une famille souple mais structurée. Les pilules sont réservées aux statuts courts ; elles ne servent pas de contenant universel.
 
-Le composant `<Card>` (`src/components/window.tsx`) est le seul chemin — c'est ce
-qui empêche une section ajoutée plus tard d'importer son propre langage visuel.
+# Components
 
----
+- **Carte** : surface papier, bordure douce, rayon 22 px, en-tête sans carré décoratif.
+- **Bouton principal** : 48 px minimum, encre sur blanc inversé ; le corail apparaît au survol ou comme signal ponctuel.
+- **Ligne** : toute la ligne est tactile, 48 px minimum, séparateurs légers.
+- **Sélecteur** : un contrôle unique remplace les groupes de nombreux petits boutons.
+- **Navigation mobile** : cinq zones de largeur égale, icône filaire originale et libellé visible.
+- **Synthèse SCIO** : XP, maîtrise et série restent lisibles dans l’en-tête et le dashboard ; le palier est écrit en toutes lettres.
+- **Feedback de gain** : message sobre annoncé avec `aria-live="polite"`, sans confetti ni animation concurrente.
 
-## La composition
+# Internationalization
 
-```
-              BizOS ᴸᴱᴬᴿᴺᴵᴺᴳ          ← wordmark centré, hors des cartes
-                 SUJET                ← sous-titre
+- L’interface entière possède des dictionnaires français et anglais de même forme, contrôlés par TypeScript et les tests.
+- Le premier choix suit les langues du navigateur ; un choix explicite est prioritaire et persiste dans `scio:locale`.
+- `html lang` suit immédiatement la langue d’interface.
+- Le contenu n’est jamais traduit artificiellement par l’interface. Le changer de langue relève de Curriculum Studio et de l’entretien Codex localisé.
+- Toutes les ressources sont des vidéos YouTube. `source.language` doit correspondre à la locale active ; sinon le lecteur, les liens et le mode focus restent fermés avec une explication visible.
+- Aucune ressource de lecture, interactive ou interlangue ne sert de fallback silencieux.
 
-┌──────────────────┐ ┌──────────┐     ← 3 colonnes, gouttière 11 px
-│                  │ │          │
-│   colonne large  │ │  cartes  │
-│   (span 2)       │ │          │
-└──────────────────┘ └──────────┘
+# Rewards
 
-   AUJOURD'HUI  COURS  EXERCICES …    ← barre basse persistante
-```
+- Les gains proviennent exclusivement de mutations d’apprentissage explicites : première complétion, correction réussie, rappel noté au moins 2.
+- Navigation, montage et requêtes `GET` sont passifs.
+- Chaque événement porte un `eventId` idempotent dans les stockages fichier et PostgreSQL.
+- La série possède un unique jour de grâce ; XP, maîtrise et paliers sont calculés dans un domaine serveur typé.
 
-- Le wordmark `BizOS` est centré au-dessus de l'espace de travail, **jamais
-  répété dans un panneau**.
-- Trois colonnes, gouttière de **11 px**, largeur maximale 1320 px.
-- La barre basse est fixe ; le workspace réserve la place en dessous
-  (`padding-bottom: 62px`) pour que le contenu ne se perde pas derrière elle.
-- En dessous de 1180 px on passe à deux colonnes, puis à une pile de cartes sous
-  780 px.
+# Accessibility
 
----
+- Toute cible interactive mesure au moins 44 × 44 px.
+- Le focus clavier est visible sur boutons, liens, champs, sélecteurs, résumés et panneaux.
+- Les labels et noms accessibles suivent la langue d’interface.
+- Les chronomètres ne sont pas annoncés à chaque seconde ; `aria-live` est réservé aux feedbacks utiles et aux réponses asynchrones significatives.
 
-## Les commandes
+# Do's and Don'ts
 
-**Bouton** — fond noir, texte blanc, trait noir, carré, **sans ombre**. Au survol
-et au focus, les couleurs s'inversent ; le bouton ne se déplace pas.
-`.bx-btn-ghost` est son négatif. Un `aria-pressed` rend l'état sélectionné.
+## À faire
 
-**Action textuelle** — Inria Serif `0.78rem`, souligné. Le survol change
-l'opacité, jamais la position.
+- Montrer d'abord la prochaine action.
+- Replier les explications secondaires avec `details`.
+- Conserver toutes les fonctions métier derrière une hiérarchie plus simple.
+- Tester à 360, 390, 768, 1024 et 1440 px.
+- Respecter les safe areas Android/iOS et le clavier logiciel.
 
-**Ligne de ressource** (`.bx-row`) — icône, titre, métadonnée, `Ouvrir →` révélé
-au survol **et au focus**. Toute la ligne est cliquable ; au survol elle passe en
-noir, texte en blanc. Aucun mouvement vertical.
+## À éviter
 
-**Tâche / étape** (`.bx-task`) — noire à texte blanc quand elle est active,
-s'inverse au survol. Une étape inactive est grise, et son état est écrit.
-
-**Contrôle segmenté** (`.bx-segmented`) — actif : noir sur blanc inversé ;
-inactif : gris à trait noir.
-
-**Focus** — contour de 2 px, décalé de 2 px, sans déplacement. Le focus clavier
-révèle exactement les mêmes actions que le survol.
-
----
-
-## Le wallpaper
-
-Il occupe tout l'écran et reste visible autour des panneaux. **Il n'est pas
-atténué par défaut** : ce sont les cartes qui sont opaques.
-
-Les douze fonds livrés sont **procéduraux** — du SVG en data-URI écrit à la main
-dans `src/lib/wallpapers.ts`. Ce dépôt étant public, redistribuer des images de
-personnes réelles ou d'œuvres protégées poserait un problème de droits à chaque
-personne qui clone. Ils sont tous monochromes ou très désaturés : le fond apporte
-l'ambiance, jamais un accent coloré.
-
-| Groupe | Fonds |
-|---|---|
-| Atelier | Atelier, Papier, Toile |
-| Grilles | Grille, Blueprint, Points |
-| Matières | Synapse, Registre, Orbite, Relief |
-| Nuit | Minuit, Ciel |
-
-Les images de l'utilisateur vont dans `app/public/wallpapers/` (git-ignoré) et
-apparaissent dans la galerie au rechargement.
-
----
-
-## Ce qu'on ne fait pas
-
-- Pas de teinte d'accent, pas de gradient, pas de lueur, pas de flou d'ombre.
-- Pas de coin arrondi, pas de pilule.
-- Pas d'ombre sur un bouton interne.
-- Pas de mouvement au survol.
-- Pas d'emoji couleur : les icônes de matières sont des glyphes
-  (`↗ ◌ ◐ ✦ ⌁ △ ≋ ✣ ◇ ◎`).
-- Pas de trait sous un titre de section.
-- Pas de monospace comme voix générale.
-
----
-
-## Le personnaliser
-
-Sans toucher au CSS :
-
-| Quoi | Où |
-|---|---|
-| Sujet sous le wordmark | `NEXT_PUBLIC_LEARNING_SUBJECT` |
-| Fond par défaut | `NEXT_PUBLIC_DEFAULT_WALLPAPER` |
-| Durée de session par défaut | `NEXT_PUBLIC_DEFAULT_SESSION_MINUTES` |
-| Icônes de matières | `icon` dans `curriculum.json` |
-
-En touchant au CSS : tout part des variables en tête de `src/app/globals.css`.
-
----
-
-## Checklist avant de livrer un composant
-
-- [ ] Le titre suit le modèle : carré noir de 9 px, serif, **pas de trait dessous**.
-- [ ] La palette reste monochrome.
-- [ ] Les coins sont carrés, le trait principal fait 1 px.
-- [ ] L'ombre de carte est `5px 5px 0`, aucun bouton interne n'a d'ombre.
-- [ ] Rien ne bouge au survol.
-- [ ] Le focus clavier révèle les mêmes actions que le survol.
-- [ ] Aucun état ne repose sur la seule couleur.
-- [ ] Vérifié à 1440 × 900, 1280 × 800 et en pile mobile.
+- Ne pas reprendre le shell, les ombres ou le wallpaper BizOS V9.
+- Ne pas copier l'agencement exact d'un produit tiers.
+- Ne pas transformer le mobile en simple version empilée du desktop.
+- Ne pas cacher une fonction essentielle uniquement au survol.
+- Ne pas demander de permission native sans nécessité fonctionnelle.

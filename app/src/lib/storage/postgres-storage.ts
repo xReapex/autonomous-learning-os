@@ -9,7 +9,8 @@ import { Pool } from "pg";
 
 import type { CardState } from "@/lib/scheduler";
 import type { LessonProgress } from "@/lib/lesson-progress";
-import type { Storage, StoredAnswer } from "./types";
+import { applyRewardEvent, duplicateRewardGrant, emptyRewardState, masteryLevelFor, tierForXp, type RewardEvent, type RewardState } from "@/lib/rewards";
+import type { Storage } from "./types";
 
 let pool: Pool | null = null;
 let schemaReady: Promise<void> | null = null;
@@ -75,6 +76,29 @@ CREATE TABLE IF NOT EXISTS exercise_answers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS exercise_answers_created_idx ON exercise_answers (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS reward_state (
+  id                 SMALLINT PRIMARY KEY CHECK (id = 1),
+  total_xp           INTEGER NOT NULL DEFAULT 0,
+  mastery_points     INTEGER NOT NULL DEFAULT 0,
+  streak_current     INTEGER NOT NULL DEFAULT 0,
+  streak_longest     INTEGER NOT NULL DEFAULT 0,
+  streak_last_active DATE,
+  streak_grace_used  BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at         TIMESTAMPTZ
+);
+INSERT INTO reward_state (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS reward_events (
+  event_id    TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  subject_id  TEXT NOT NULL,
+  item_id     TEXT NOT NULL,
+  xp          INTEGER NOT NULL,
+  mastery     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS reward_events_occurred_idx ON reward_events (occurred_at DESC);
 `;
 
 // Une seule migration par processus, même si dix requêtes arrivent ensemble.
@@ -128,6 +152,45 @@ function toCardState(row: CardRow): CardState {
     lastReviewedAt: row.last_reviewed_at?.toISOString() ?? null,
     totalReviews: row.total_reviews,
     lapses: row.lapses,
+  };
+}
+
+type RewardRow = {
+  total_xp: number;
+  mastery_points: number;
+  streak_current: number;
+  streak_longest: number;
+  streak_last_active: Date | string | null;
+  streak_grace_used: boolean;
+  updated_at: Date | string | null;
+};
+
+function toDate(value: Date | string | null): string | null {
+  if (!value) return null;
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function toDateOnly(value: Date | string | null): string | null {
+  const normalized = toDate(value);
+  return normalized?.slice(0, 10) ?? null;
+}
+
+function toRewardState(row: RewardRow | undefined): RewardState {
+  if (!row) return emptyRewardState();
+  const state = emptyRewardState();
+  state.totalXp = Number(row.total_xp);
+  state.masteryPoints = Number(row.mastery_points);
+  state.streak = {
+    current: Number(row.streak_current),
+    longest: Number(row.streak_longest),
+    lastActiveOn: toDateOnly(row.streak_last_active),
+    graceUsed: row.streak_grace_used,
+  };
+  state.updatedAt = toDate(row.updated_at);
+  return {
+    ...state,
+    masteryLevel: masteryLevelFor(state.masteryPoints),
+    tier: tierForXp(state.totalXp),
   };
 }
 
@@ -243,7 +306,8 @@ export function createPostgresStorage(): Storage {
       await ensureSchema();
       await getPool().query(
         `INSERT INTO exercise_answers (id, lesson_id, subject_id, question, answer, feedback, provider, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         ON CONFLICT (id) DO NOTHING`,
         [answer.id, answer.lessonId, answer.subjectId, answer.question, answer.answer, answer.feedback, answer.provider],
       );
       return answer;
@@ -265,6 +329,79 @@ export function createPostgresStorage(): Storage {
         provider: row.provider,
         createdAt: row.created_at.toISOString(),
       }));
+    },
+
+    async getRewardState() {
+      try {
+        const { rows } = await getPool().query<RewardRow>("SELECT * FROM reward_state WHERE id = 1");
+        return toRewardState(rows[0]);
+      } catch (error) {
+        // 42P01 = table absente. Un GET reste strictement passif : la première
+        // mutation créera le schéma, mais une simple consultation ne le fait pas.
+        if ((error as { code?: string }).code === "42P01") return emptyRewardState();
+        throw error;
+      }
+    },
+
+    async awardReward(event: RewardEvent) {
+      await ensureSchema();
+      const client = await getPool().connect();
+      try {
+        await client.query("BEGIN");
+        const inserted = await client.query<{ event_id: string }>(
+          `INSERT INTO reward_events (event_id, kind, occurred_at, subject_id, item_id, xp, mastery)
+           VALUES ($1, $2, $3, $4, $5, 0, 0)
+           ON CONFLICT (event_id) DO NOTHING
+           RETURNING event_id`,
+          [event.eventId, event.kind, event.occurredAt, event.subjectId, event.itemId],
+        );
+        const currentRows = await client.query<RewardRow>("SELECT * FROM reward_state WHERE id = 1 FOR UPDATE");
+        const current = toRewardState(currentRows.rows[0]);
+        if (inserted.rowCount === 0) {
+          await client.query("COMMIT");
+          return duplicateRewardGrant(event, current);
+        }
+
+        const applied = applyRewardEvent(current, event);
+        await client.query(
+          `UPDATE reward_state SET
+             total_xp = $1,
+             mastery_points = $2,
+             streak_current = $3,
+             streak_longest = $4,
+             streak_last_active = $5,
+             streak_grace_used = $6,
+             updated_at = $7
+           WHERE id = 1`,
+          [
+            applied.state.totalXp,
+            applied.state.masteryPoints,
+            applied.state.streak.current,
+            applied.state.streak.longest,
+            applied.state.streak.lastActiveOn,
+            applied.state.streak.graceUsed,
+            applied.state.updatedAt,
+          ],
+        );
+        await client.query(
+          "UPDATE reward_events SET xp = $1, mastery = $2 WHERE event_id = $3",
+          [applied.reward.xp, applied.reward.mastery, event.eventId],
+        );
+        await client.query("COMMIT");
+        return {
+          eventId: event.eventId,
+          kind: event.kind,
+          awarded: true,
+          reward: applied.reward,
+          tierUnlocked: applied.tierUnlocked,
+          state: applied.state,
+        };
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     async ping() {

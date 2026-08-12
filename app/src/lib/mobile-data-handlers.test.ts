@@ -1,0 +1,135 @@
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import { createMobileDataHandlers } from './mobile-data-handlers';
+import { loadMobileDefaultData } from './mobile-default-data';
+import { createScioUserDataStore } from './scio-user-data-store';
+
+const userA = { id: 'usr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', displayName: 'A', provider: 'development' as const };
+const userB = { id: 'usr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', displayName: 'B', provider: 'development' as const };
+let defaultData: Awaited<ReturnType<typeof loadMobileDefaultData>>;
+
+function request(path: string, token?: string, init: RequestInit = {}) {
+  return new Request(`https://learning.scio.app/api/mobile/data/${path}`, {
+    ...init,
+    headers: {
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+}
+
+describe('handlers de données mobile SCIO', () => {
+  let handlers: ReturnType<typeof createMobileDataHandlers>;
+
+  beforeEach(async () => {
+    defaultData = await loadMobileDefaultData();
+    const users = createScioUserDataStore({
+      dataDirectory: await mkdtemp(join(tmpdir(), 'scio-mobile-handlers-')),
+    });
+    handlers = createMobileDataHandlers({
+      auth: {
+        verifySession: async (token: string) => {
+          if (token === 'token-a'.repeat(6)) return { user: userA, entitlement: 'demo', expiresAt: '2099-01-01T00:00:00.000Z' };
+          if (token === 'token-b'.repeat(6)) return { user: userB, entitlement: 'demo', expiresAt: '2099-01-01T00:00:00.000Z' };
+          return null;
+        },
+      },
+      users,
+      loadDefaultData: async () => defaultData,
+    });
+  });
+
+  it('refuse une lecture sans session SCIO', async () => {
+    const response = await handlers.getCurriculum(request('curriculum'));
+    expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+  });
+
+  it('sert curriculum et cartes à une session valide', async () => {
+    const token = 'token-a'.repeat(6);
+    const curriculum = await handlers.getCurriculum(request('curriculum', token));
+    const cards = await handlers.getCards(request('cards', token));
+
+    expect(curriculum.status).toBe(200);
+    expect((await curriculum.json()).course.id).toBe('clear-thinking');
+    expect(await cards.json()).toEqual({ cards: defaultData.cards, exercises: defaultData.exercises });
+  });
+
+  it('partitionne progression et mutations par user_id dérivé du Bearer', async () => {
+    const tokenA = 'token-a'.repeat(6);
+    const tokenB = 'token-b'.repeat(6);
+    const mutation = JSON.stringify({
+      eventId: 'lesson:one:completed',
+      lessonId: 'recognize-bias',
+      status: 'completed',
+    });
+
+    expect((await handlers.patchProgress(request('progress', tokenA, { method: 'PATCH', body: mutation }))).status).toBe(204);
+    const progressA = await (await handlers.getProgress(request('progress', tokenA))).json();
+    const progressB = await (await handlers.getProgress(request('progress', tokenB))).json();
+
+    expect(progressA.completedLessonIds).toEqual(['recognize-bias']);
+    expect(progressB.completedLessonIds).toEqual([]);
+  });
+
+  it('rejette une mutation qui cible un objet hors curriculum', async () => {
+    const response = await handlers.patchCard(request('cards/unknown', 'token-a'.repeat(6), {
+      method: 'PATCH',
+      body: JSON.stringify({ eventId: 'card:unknown', cardId: 'unknown', result: 'recalled' }),
+    }), 'unknown');
+    expect(response.status).toBe(404);
+  });
+
+  it('enregistre une note uniquement pour son propriétaire', async () => {
+    const response = await handlers.postNote(request('notes', 'token-a'.repeat(6), {
+      method: 'POST',
+      body: JSON.stringify({ lessonId: 'recognize-bias', body: 'Note privée' }),
+    }));
+    expect(response.status).toBe(204);
+  });
+
+  it('stocke et relit un curriculum personnalisé uniquement pour son propriétaire', async () => {
+    const custom = structuredClone(defaultData);
+    custom.curriculum.course.id = 'custom-course-a';
+    const tokenA = 'token-a'.repeat(6);
+    const tokenB = 'token-b'.repeat(6);
+
+    const saved = await handlers.putCurriculum(request('curriculum', tokenA, {
+      method: 'PUT',
+      body: JSON.stringify(custom),
+    }));
+    expect(saved.status).toBe(204);
+
+    const curriculumA = await (await handlers.getCurriculum(request('curriculum', tokenA))).json();
+    const curriculumB = await (await handlers.getCurriculum(request('curriculum', tokenB))).json();
+    expect(curriculumA.course.id).toBe('custom-course-a');
+    expect(curriculumB.course.id).toBe('clear-thinking');
+  });
+
+  it('réconcilie durablement la progression lors du remplacement du curriculum', async () => {
+    const token = 'token-a'.repeat(6);
+    const completed = JSON.stringify({
+      eventId: 'lesson:old:completed',
+      lessonId: 'recognize-bias',
+      status: 'completed',
+    });
+    expect((await handlers.patchProgress(request('progress', token, { method: 'PATCH', body: completed }))).status).toBe(204);
+
+    const replacement = structuredClone(defaultData);
+    replacement.curriculum.course.modules = replacement.curriculum.course.modules.map((module) => ({
+      ...module,
+      lessons: module.lessons.filter((lesson) => lesson.id !== 'recognize-bias'),
+    }));
+    const saved = await handlers.putCurriculum(request('curriculum', token, {
+      method: 'PUT',
+      body: JSON.stringify(replacement),
+    }));
+    expect(saved.status).toBe(204);
+
+    const progress = await (await handlers.getProgress(request('progress', token))).json();
+    expect(progress.completedLessonIds).toEqual([]);
+  });
+});

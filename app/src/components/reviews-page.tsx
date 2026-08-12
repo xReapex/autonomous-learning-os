@@ -3,8 +3,12 @@
 import { useEffect, useState } from "react";
 
 import type { ReviewCard } from "@/lib/curriculum";
-import { subjects } from "@/lib/curriculum";
-import { gradeLabels, previewInterval, type CardState, type ReviewGrade } from "@/lib/scheduler";
+import type { LocaleKey } from "@/lib/i18n";
+import type { RewardGrant } from "@/lib/rewards";
+import { previewInterval, type CardState, type ReviewGrade } from "@/lib/scheduler";
+import { useCurriculum } from "./curriculum-context";
+import { useLocale } from "./locale-context";
+import { useRewards } from "./rewards-context";
 import { Card } from "./window";
 
 type DueCard = ReviewCard & { state: CardState };
@@ -13,6 +17,15 @@ type Queue = { due: DueCard[]; total: number; upcoming: { date: string; count: n
 const GRADES: ReviewGrade[] = [0, 1, 2, 3];
 
 export function ReviewsPage() {
+  const { revision } = useCurriculum();
+  return <ReviewsSession key={revision} />;
+}
+
+function ReviewsSession() {
+  const { curriculum } = useCurriculum();
+  const { locale, t } = useLocale();
+  const { recordGrant } = useRewards();
+  const subjects = curriculum.subjects;
   const [queue, setQueue] = useState<Queue | null>(null);
   const [index, setIndex] = useState(0);
   const [showBack, setShowBack] = useState(false);
@@ -30,24 +43,29 @@ export function ReviewsPage() {
     const card = queue?.due[index];
     if (!card) return;
 
-    setLastInterval(previewInterval(card.state, value));
+    setLastInterval(previewInterval(card.state, value, locale));
     setReviewed((current) => current + 1);
     setShowBack(false);
     setIndex((current) => current + 1);
 
     // Envoi optimiste : la file avance tout de suite, la note se persiste en
     // arrière-plan. Une révision ne doit jamais attendre le réseau.
+    const eventId = crypto.randomUUID();
     void fetch("/api/cards", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ cardId: card.id, grade: value }),
+      body: JSON.stringify({ cardId: card.id, grade: value, eventId }),
+    }).then(async (response) => {
+      if (!response.ok) return;
+      const body = await response.json() as { reward?: RewardGrant | null };
+      recordGrant(body.reward);
     }).catch(() => undefined);
   }
 
   if (!queue) {
     return (
       <div className="bx-col bx-col-full">
-        <div className="bx-loader" role="status">Chargement de ta file…</div>
+        <div className="bx-loader" role="status">{t("reviews.loading")}</div>
       </div>
     );
   }
@@ -59,22 +77,22 @@ export function ReviewsPage() {
   return (
     <>
       <div className="bx-col bx-col-wide">
-        <Card title="File du jour" right={lastInterval ? `précédente ${lastInterval}` : `${queue.due.length} dues`}>
+        <Card title={t("reviews.todayQueue")} right={lastInterval ? t("reviews.previous", { interval: lastInterval }) : t("reviews.due", { count: queue.due.length })}>
           <div className="bx-page-head">
-            <p className="bx-overline">Espace révisions</p>
-            <h1>Retrouver, pas reconnaître.</h1>
+            <p className="bx-overline">{t("reviews.space")}</p>
+            <h1>{t("reviews.title")}</h1>
           </div>
 
           {done ? (
             <>
               <div className="bx-metric">
                 <span className="bx-metric-value">{reviewed}</span>
-                <span className="bx-metric-label">{reviewed > 0 ? "cartes révisées" : "rien à réviser"}</span>
+                <span className="bx-metric-label">{reviewed > 0 ? t("reviews.reviewed") : t("reviews.nothing")}</span>
               </div>
               <p className="bx-muted">
                 {reviewed > 0
-                  ? "File terminée. Les prochaines reviendront à leur date d'échéance."
-                  : "Aucune carte due aujourd'hui. Reviens demain, ou avance dans le cours pour en créer."}
+                  ? t("reviews.finished")
+                  : t("reviews.empty")}
               </p>
             </>
           ) : (
@@ -84,8 +102,8 @@ export function ReviewsPage() {
                 <strong>{showBack ? card.back : card.front}</strong>
                 <small>
                   {showBack
-                    ? "Évalue la difficulté réelle de la récupération."
-                    : "Formule ta réponse à voix haute, puis retourne la carte."}
+                    ? t("reviews.rate")
+                    : t("reviews.flip")}
                 </small>
               </button>
 
@@ -93,14 +111,14 @@ export function ReviewsPage() {
                 <div className="bx-grades">
                   {GRADES.map((value) => (
                     <button key={value} type="button" className="bx-btn" onClick={() => void grade(value)}>
-                      {gradeLabels[value]}
-                      <small>{previewInterval(card.state, value)}</small>
+                      {t((["reviews.grade.again", "reviews.grade.hard", "reviews.grade.good", "reviews.grade.easy"] as LocaleKey[])[value])}
+                      <small>{previewInterval(card.state, value, locale)}</small>
                     </button>
                   ))}
                 </div>
               ) : (
                 <p className="bx-muted">
-                  Carte {index + 1} sur {queue.due.length} · révisions faites : {card.state.totalReviews}
+                  {t("reviews.position", { current: index + 1, total: queue.due.length, reviews: card.state.totalReviews })}
                 </p>
               )}
             </>
@@ -109,19 +127,18 @@ export function ReviewsPage() {
       </div>
 
       <div className="bx-col">
-        <Card title="Pourquoi ça marche">
-          <p style={{ fontSize: "0.95rem", fontWeight: 700 }}>L&apos;effort de rappel est le signal.</p>
+        <Card title={t("reviews.why")}>
+          <p style={{ fontSize: "0.95rem", fontWeight: 700 }}>{t("reviews.effort")}</p>
           <p className="bx-muted">
-            Relire donne une impression de familiarité. Tenter de répondre mesure l&apos;accès réel à la
-            connaissance — et indique quoi réviser ensuite.
+            {t("reviews.explanation")}
           </p>
         </Card>
 
-        <Card title="Sept prochains jours">
+        <Card title={t("reviews.nextSeven")}>
           {queue.upcoming.map((day) => (
             <div className="bx-stat" key={day.date}>
               <span>
-                {new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric" }).format(new Date(`${day.date}T00:00:00`))}
+                {new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric" }).format(new Date(`${day.date}T00:00:00`))}
               </span>
               <div style={{ flex: 1, margin: "0 10px" }}>
                 <div className="bx-meter">
@@ -133,7 +150,7 @@ export function ReviewsPage() {
           ))}
         </Card>
 
-        <Card title="Couverture" right={`${queue.total} cartes`}>
+        <Card title={t("reviews.coverage")} right={t("common.cards", { count: queue.total })}>
           <ul className="bx-list">
             {subjects.map((subject) => (
               <li key={subject.id}>

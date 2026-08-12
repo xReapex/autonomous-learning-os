@@ -183,7 +183,7 @@ refuse s'il manque : sans embed, ni le découpage ni la reprise ne fonctionnent.
 
 | Absent | Raison |
 |---|---|
-| Authentification | L'app est mono-utilisateur, sur ta machine. `APP_PASSWORD` existe si tu la déploies, mais ce n'est pas un système de comptes. |
+| Authentification native | L'app reste mono-utilisateur. En ligne, l'authentification obligatoire est assurée par le reverse proxy documenté dans `deploy/`; aucun `APP_PASSWORD` applicatif trompeur n'est accepté. |
 | Multi-utilisateur | Change le modèle de données de fond en comble. Ce n'est pas ce produit. |
 | Tailwind | Une feuille CSS de 700 lignes lisible bat une chaîne de build pour ce volume. |
 | Police web | `next/font` demande le réseau au build. L'app doit se construire hors ligne. |

@@ -1,0 +1,28 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DEPLOYMENT_ENV": "preview",
+        "EXPO_PUBLIC_DEV_AUTH_MODE": "true",
+        "EXPO_PUBLIC_API_URL": "https://scio-preview.141.227.152.154.nip.io/api",
+        "EXPO_PUBLIC_ENGINE_URL": "https://scio-preview.141.227.152.154.nip.io/api/mobile"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_DEPLOYMENT_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://learning-os.141.227.152.154.nip.io/api",
+        "EXPO_PUBLIC_ENGINE_URL": "https://learning-os.141.227.152.154.nip.io/api/mobile"
+      }
+    }
+  }
+}
