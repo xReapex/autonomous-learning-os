@@ -78,7 +78,7 @@ export function CourseGenerationTaskBar() {
         {
           left: fluid.gutter,
           right: fluid.gutter,
-          bottom: (inTabs ? fluid.tabBarHeight : insets.bottom) + fluid.gutter * 0.6,
+          bottom: insets.bottom + (inTabs ? fluid.tabBarHeight : 0) + fluid.gutter * 0.6,
         },
       ]}>
       <Pressable

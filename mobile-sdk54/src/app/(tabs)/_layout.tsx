@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon } from '@/components/app-icon';
 import { elevation, layout, palette, radius, typography } from '@/constants/theme';
@@ -11,6 +12,7 @@ type TabIconProps = { color: ColorValue; focused: boolean; size: number };
 export default function TabsLayout() {
   const { t } = useLocale();
   const fluid = useFluidLayout();
+  const insets = useSafeAreaInsets();
   const tabs = [
     { name: 'index', title: t('tabs.home'), icon: 'home' },
     { name: 'courses', title: t('tabs.courses'), icon: 'book-open' },
@@ -43,7 +45,7 @@ export default function TabsLayout() {
           position: 'absolute',
           left: fluid.gutter,
           right: fluid.gutter,
-          bottom: fluid.gutter * 0.4,
+          bottom: insets.bottom + fluid.gutter * 0.4,
           height: fluid.tabBarHeight,
           backgroundColor: palette.ink,
           borderColor: palette.inkSoft,

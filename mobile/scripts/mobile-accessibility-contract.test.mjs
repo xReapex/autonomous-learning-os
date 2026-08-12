@@ -23,6 +23,16 @@ test('les libellés de boutons restent lisibles avec une grande police', async (
   assert.match(ui, /buttonLabel:\s*\{[\s\S]*?textAlign:\s*'center'/);
 });
 
+test('les barres flottantes restent au-dessus de la navigation système', async () => {
+  const [tabs, taskBar] = await Promise.all([
+    source('app/(tabs)/_layout.tsx'),
+    source('components/course-generation-task-bar.tsx'),
+  ]);
+  assert.match(tabs, /useSafeAreaInsets\(\)/);
+  assert.match(tabs, /bottom:\s*insets\.bottom\s*\+\s*fluid\.gutter\s*\*\s*0\.4/);
+  assert.match(taskBar, /bottom:\s*insets\.bottom\s*\+\s*\(inTabs\s*\?\s*fluid\.tabBarHeight\s*:\s*0\)\s*\+\s*fluid\.gutter\s*\*\s*0\.6/);
+});
+
 test('les changements de réponse et de mutation sont annoncés', async () => {
   const [reviews, courses] = await Promise.all([
     source('app/(tabs)/reviews.tsx'),
