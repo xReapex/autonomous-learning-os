@@ -48,17 +48,23 @@ export function getApiConfiguration(): ApiConfiguration {
 }
 
 async function request<T>(baseUrl: string, path: string, init?: RequestInit): Promise<T> {
+  const response = await requestResponse(baseUrl, path, init);
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+async function requestResponse(baseUrl: string, path: string, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
 
   try {
+    const headers = new Headers(init?.headers);
+    headers.set('Accept', 'application/json');
+    if (init?.body) headers.set('Content-Type', 'application/json');
     const response = await authenticatedFetch(`${baseUrl}/${path}`, {
       ...init,
       signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      },
+      headers,
     });
 
     if (!response.ok) {
@@ -75,10 +81,7 @@ async function request<T>(baseUrl: string, path: string, init?: RequestInit): Pr
       throw new ApiError('unexpected', `HTTP_${response.status}`);
     }
 
-    if (response.status === 204) {
-      return undefined as T;
-    }
-    return (await response.json()) as T;
+    return response;
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
@@ -97,28 +100,54 @@ async function request<T>(baseUrl: string, path: string, init?: RequestInit): Pr
 }
 
 export async function getCurriculum(baseUrl: string): Promise<Curriculum | null> {
+  return (await getCurriculumSnapshot(baseUrl)).curriculum;
+}
+
+function responseRevision(response: Response): string {
+  const revision = response.headers.get('etag');
+  if (!revision || !/^"[a-f0-9]{64}"$/.test(revision)) throw new Error('DTO_CURRICULUM_REVISION_INVALID');
+  return revision;
+}
+
+export async function getCurriculumSnapshot(
+  baseUrl: string,
+): Promise<{ curriculum: Curriculum | null; revision: string }> {
   try {
-    const payload = await request<unknown>(baseUrl, 'mobile/data/curriculum');
-    return payload === undefined ? null : parseCurriculumDto(payload);
+    const response = await requestResponse(baseUrl, 'mobile/data/curriculum');
+    const revision = responseRevision(response);
+    if (response.status === 204) return { curriculum: null, revision };
+    return { curriculum: parseCurriculumDto(await response.json()), revision };
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError('unexpected', 'DTO_CURRICULUM_INVALID');
   }
 }
 
-export function deleteCurriculum(baseUrl: string): Promise<void> {
-  return request(baseUrl, 'mobile/data/curriculum', { method: 'DELETE' });
+function requireNoContent(response: Response): void {
+  if (response.status !== 204) throw new ApiError('unexpected', `HTTP_${response.status}`);
 }
 
-export function replaceCurriculum(baseUrl: string, data: ScioData): Promise<void> {
-  return request(baseUrl, 'mobile/data/curriculum', {
+export async function deleteCurriculum(baseUrl: string, revision: string): Promise<string> {
+  const response = await requestResponse(baseUrl, 'mobile/data/curriculum', {
+    method: 'DELETE',
+    headers: { 'If-Match': revision },
+  });
+  requireNoContent(response);
+  return responseRevision(response);
+}
+
+export async function replaceCurriculum(baseUrl: string, data: ScioData, revision: string): Promise<string> {
+  const response = await requestResponse(baseUrl, 'mobile/data/curriculum', {
     method: 'PUT',
+    headers: { 'If-Match': revision },
     body: JSON.stringify({
       curriculum: data.curriculum,
       exercises: data.exercises,
       cards: data.cards,
     }),
   });
+  requireNoContent(response);
+  return responseRevision(response);
 }
 
 export async function getCards(
@@ -148,17 +177,26 @@ export async function getProgress(baseUrl: string): Promise<Progress> {
   }
 }
 
-export function mutateProgress(baseUrl: string, mutation: ProgressMutation): Promise<void> {
-  return request(baseUrl, 'mobile/data/progress', { method: 'PATCH', body: JSON.stringify(mutation) });
-}
-
-export function mutateCard(baseUrl: string, mutation: CardMutation): Promise<void> {
-  return request(baseUrl, `mobile/data/cards/${encodeURIComponent(mutation.cardId)}`, {
+export function mutateProgress(baseUrl: string, mutation: ProgressMutation, revision: string): Promise<void> {
+  return request(baseUrl, 'mobile/data/progress', {
     method: 'PATCH',
+    headers: { 'If-Match': revision },
     body: JSON.stringify(mutation),
   });
 }
 
-export function createNote(baseUrl: string, mutation: NoteMutation): Promise<void> {
-  return request(baseUrl, 'mobile/data/notes', { method: 'POST', body: JSON.stringify(mutation) });
+export function mutateCard(baseUrl: string, mutation: CardMutation, revision: string): Promise<void> {
+  return request(baseUrl, `mobile/data/cards/${encodeURIComponent(mutation.cardId)}`, {
+    method: 'PATCH',
+    headers: { 'If-Match': revision },
+    body: JSON.stringify(mutation),
+  });
+}
+
+export function createNote(baseUrl: string, mutation: NoteMutation, revision: string): Promise<void> {
+  return request(baseUrl, 'mobile/data/notes', {
+    method: 'POST',
+    headers: { 'If-Match': revision },
+    body: JSON.stringify(mutation),
+  });
 }

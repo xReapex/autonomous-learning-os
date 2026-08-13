@@ -7,11 +7,11 @@ describe('suppression durable du sujet actif', () => {
     const order: string[] = [];
 
     await removeCurriculumDurably({
-      removeRemote: async () => { order.push('server'); },
-      removeCache: async () => { order.push('cache'); },
+      removeRemote: async () => { order.push('server'); return `"${'e'.repeat(64)}"`; },
+      removeCache: async (revision) => { order.push(`cache:${revision}`); },
     });
 
-    expect(order).toEqual(['server', 'cache']);
+    expect(order).toEqual(['server', `cache:"${'e'.repeat(64)}"`]);
   });
 
   it('conserve le cache si le serveur refuse la suppression', async () => {

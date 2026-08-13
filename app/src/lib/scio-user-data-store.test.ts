@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { createScioUserDataStore, UserDataStoreError } from './scio-user-data-store';
+import {
+  createScioUserDataStore,
+  curriculumFingerprint,
+  UserDataStoreError,
+} from './scio-user-data-store';
 
 const userA = 'usr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const userB = 'usr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -64,11 +68,182 @@ describe('stockage pédagogique SCIO par utilisateur', () => {
     }));
     const data = createScioUserDataStore({ dataDirectory: directory });
 
-    expect(await data.readCurriculumState(userA)).toEqual({ status: 'default' });
+    const state = await data.readCurriculumState(userA);
+    expect(state.status).toBe('default');
+    if (state.status !== 'default') throw new Error('default_state_missing');
+    expect(state.revision).toMatch(/^[a-f0-9]{64}$/);
     expect(await data.readProgress(userA)).toMatchObject({
       completedLessonIds: ['lesson-one'],
       weeklyLessons: 1,
     });
+  });
+
+  it('persiste une génération opaque pour un nouveau compte avant toute mutation', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-new-revision-'));
+    const firstStore = createScioUserDataStore({ dataDirectory: directory });
+    const secondStore = createScioUserDataStore({ dataDirectory: directory });
+
+    const first = await firstStore.readCurriculumState(userA);
+    const second = await secondStore.readCurriculumState(userA);
+    expect(first.status).toBe('default');
+    expect(second).toEqual(first);
+    if (first.status !== 'default' || !first.revision) throw new Error('default_revision_missing');
+    expect(first.revision).toMatch(/^[a-f0-9]{64}$/);
+
+    const persisted = JSON.parse(await readFile(join(directory, 'users', userA, 'data.json'), 'utf8'));
+    expect(persisted.curriculumRevision).toBe(first.revision);
+  });
+
+  it('dérive une révision vide stable pour un ancien fichier avant sa migration', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-legacy-empty-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: [],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 0,
+        weeklyReviews: 0,
+      },
+      processedEventIds: [],
+      notes: [],
+      curriculum: null,
+      curriculumCleared: true,
+      archivedCurricula: [],
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    const first = await data.readCurriculumState(userA);
+    const second = await data.readCurriculumState(userA);
+    expect(first).toEqual(second);
+    expect(first).toMatchObject({ status: 'empty' });
+    if (first.status !== 'empty') throw new Error('curriculum_state_not_empty');
+    expect(first.revision).toMatch(/^[a-f0-9]{64}$/);
+
+    const curriculum = { curriculum: { course: { id: 'new', modules: [] } }, exercises: [], cards: [] };
+    const nextRevision = await data.saveCurriculum(userA, curriculum, {
+      expectedCurriculumRevision: first.revision,
+    });
+    expect(nextRevision).toMatch(/^[a-f0-9]{64}$/);
+    expect(nextRevision).not.toBe(first.revision);
+  });
+
+  it('rejette une archive dont l’identité déclarée ne correspond pas à son contenu', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-invalid-archive-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    const archivedCurriculum = {
+      curriculum: { course: { id: 'archive-real', modules: [] } },
+      exercises: [],
+      cards: [],
+    };
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: [],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 0,
+        weeklyReviews: 0,
+      },
+      processedEventIds: [],
+      notes: [],
+      curriculum: null,
+      curriculumCleared: true,
+      archivedCurricula: [{
+        courseId: 'archive-forged',
+        fingerprint: curriculumFingerprint({ forged: true }),
+        curriculum: archivedCurriculum,
+        progress: {
+          completedLessonIds: ['lesson-private'],
+          passedExerciseIds: [],
+          recalledCardIds: [],
+          weeklyLessons: 1,
+          weeklyReviews: 0,
+        },
+        processedEventIds: ['lesson:private'],
+        notes: [{ lessonId: 'lesson-private', body: 'Privée' }],
+      }],
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    await expect(data.readCurriculumState(userA)).rejects.toMatchObject({ code: 'storage_invalid' });
+  });
+
+  it('rejette un fichier incohérent marqué vide avec un curriculum encore actif', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-inconsistent-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: [],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 0,
+        weeklyReviews: 0,
+      },
+      processedEventIds: [],
+      notes: [],
+      curriculum: { curriculum: { course: { id: 'still-active' } } },
+      curriculumCleared: true,
+      archivedCurricula: [],
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    await expect(data.readCurriculumState(userA)).rejects.toMatchObject({ code: 'storage_invalid' });
+    await expect(data.clearCurriculum(userA)).rejects.toMatchObject({ code: 'storage_invalid' });
+  });
+
+  it('rejette un tombstone vide qui contient encore des données pédagogiques actives', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-invalid-empty-payload-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: ['lesson-hidden'],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 1,
+        weeklyReviews: 0,
+      },
+      processedEventIds: ['lesson:hidden'],
+      notes: [{ lessonId: 'lesson-hidden', body: 'masquée' }],
+      curriculum: null,
+      curriculumCleared: true,
+      curriculumRevision: 'a'.repeat(64),
+      archivedCurricula: [],
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    await expect(data.readCurriculumState(userA)).rejects.toMatchObject({ code: 'storage_invalid' });
+  });
+
+  it('refuse de vider des données historiques sans curriculum archivable ni fallback', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-orphaned-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: ['lesson-one'],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 1,
+        weeklyReviews: 0,
+      },
+      processedEventIds: ['lesson:one:completed'],
+      notes: [{ lessonId: 'lesson-one', body: 'À préserver.' }],
+      curriculum: null,
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    await expect(data.clearCurriculum(userA)).rejects.toMatchObject({ code: 'mutation_invalid' });
+    expect(await data.readProgress(userA)).toMatchObject({ completedLessonIds: ['lesson-one'] });
+    expect(await data.readNotes(userA)).toEqual([{ lessonId: 'lesson-one', body: 'À préserver.' }]);
   });
 
   it('retire le curriculum actif sans détruire ses données et les restaure au réajout', async () => {
@@ -93,7 +268,7 @@ describe('stockage pédagogique SCIO par utilisateur', () => {
 
     await data.clearCurriculum(userA, curriculum);
 
-    expect(await data.readCurriculumState(userA)).toEqual({ status: 'empty' });
+    expect(await data.readCurriculumState(userA)).toMatchObject({ status: 'empty' });
     expect(await data.readProgress(userA)).toEqual({
       completedLessonIds: [],
       passedExerciseIds: [],
@@ -184,6 +359,83 @@ describe('stockage pédagogique SCIO par utilisateur', () => {
     expect(await data.readNotes(userA)).toEqual([
       { lessonId: 'lesson-old', body: 'Ancienne note.' },
     ]);
+  });
+
+  it('rejette sous verrou une mutation portant la révision d’un ancien curriculum', async () => {
+    const data = await store();
+    const original = {
+      curriculum: { course: { id: 'shared-course', title: 'Original', modules: [{ lessons: [{ id: 'lesson-shared' }] }] } },
+      exercises: [],
+      cards: [],
+    };
+    const replacement = structuredClone(original);
+    replacement.curriculum.course.title = 'Replacement';
+    await data.saveCurriculum(userA, original);
+    const staleRevision = curriculumFingerprint(original);
+    await data.saveCurriculum(userA, replacement);
+
+    await expect(data.applyProgress(userA, {
+      eventId: 'lesson:stale:completed',
+      lessonId: 'lesson-shared',
+      status: 'completed',
+    }, {
+      expectedCurriculumRevision: staleRevision,
+      fallbackCurriculum: original,
+    })).rejects.toMatchObject({ code: 'curriculum_revision_mismatch' });
+    expect(await data.readProgress(userA)).toMatchObject({ completedLessonIds: [] });
+  });
+
+  it('rejette sous verrou une mutation préparée avant le retrait du curriculum', async () => {
+    const data = await store();
+    const curriculum = {
+      curriculum: { course: { id: 'shared', modules: [{ lessons: [{ id: 'lesson-shared' }] }] } },
+      exercises: [],
+      cards: [],
+    };
+    await data.saveCurriculum(userA, curriculum);
+    const state = await data.readCurriculumState(userA);
+    if (state.status !== 'custom') throw new Error('curriculum_state_not_custom');
+
+    await data.clearCurriculum(userA, curriculum, {
+      expectedCurriculumRevision: state.revision,
+      fallbackCurriculum: curriculum,
+    });
+    await expect(data.applyProgress(userA, {
+      eventId: 'lesson:late-after-delete',
+      lessonId: 'lesson-shared',
+      status: 'completed',
+    }, {
+      expectedCurriculumRevision: state.revision,
+      fallbackCurriculum: curriculum,
+    })).rejects.toMatchObject({ code: 'curriculum_revision_mismatch' });
+    expect(await data.readProgress(userA)).toMatchObject({ completedLessonIds: [] });
+  });
+
+  it('rejette sous verrou une activation retardée après le retrait du curriculum', async () => {
+    const data = await store();
+    const original = {
+      curriculum: { course: { id: 'shared', modules: [{ lessons: [{ id: 'lesson-shared' }] }] } },
+      exercises: [],
+      cards: [],
+    };
+    const replacement = structuredClone(original);
+    (replacement.curriculum as Record<string, unknown>).revisionProbe = 'replacement';
+    await data.saveCurriculum(userA, original);
+    const state = await data.readCurriculumState(userA);
+    expect(state).toMatchObject({ status: 'custom' });
+    if (state.status !== 'custom') throw new Error('curriculum_state_not_custom');
+    const staleRevision = state.revision;
+    expect(staleRevision).toMatch(/^[a-f0-9]{64}$/);
+
+    await data.clearCurriculum(userA, original, {
+      expectedCurriculumRevision: staleRevision,
+      fallbackCurriculum: original,
+    });
+    await expect(data.saveCurriculum(userA, replacement, {
+      expectedCurriculumRevision: staleRevision,
+      fallbackCurriculum: original,
+    })).rejects.toMatchObject({ code: 'curriculum_revision_mismatch' });
+    expect(await data.readCurriculumState(userA)).toMatchObject({ status: 'empty' });
   });
 
   it('refuse de retirer un curriculum non archivable plutôt que détruire ses données', async () => {

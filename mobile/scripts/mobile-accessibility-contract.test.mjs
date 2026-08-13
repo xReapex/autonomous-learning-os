@@ -46,10 +46,11 @@ test('les changements de réponse et de mutation sont annoncés', async () => {
 });
 
 test('la suppression du sujet est confirmée et mène vers un état vide recréable', async () => {
-  const [courses, profile, ui] = await Promise.all([
+  const [courses, profile, ui, i18n] = await Promise.all([
     source('app/(tabs)/courses.tsx'),
     source('app/(tabs)/profile.tsx'),
     source('components/ui.tsx'),
+    source('lib/i18n.ts'),
   ]);
   assert.match(courses, /requestDestructiveConfirmation\(\{/);
   assert.match(courses, /confirmLabel:\s*t\('curriculum\.remove'\)/);
@@ -59,7 +60,16 @@ test('la suppression du sujet est confirmée et mène vers un état vide recréa
   assert.match(ui, /router\.push\('\/create-course'/);
   assert.doesNotMatch(profile, /<DataGate>/);
   const provider = await source('providers/data-provider.tsx');
-  assert.match(provider, /removeRemote:\s*\(\)\s*=>\s*deleteCurriculumRequest/);
-  assert.match(provider, /removeCache:\s*async\s*\(\)\s*=>/);
-  assert.match(provider, /commitLatest/);
+  assert.match(provider, /removeRemote:\s*async\s*\(\)\s*=>/);
+  assert.match(provider, /currentCurriculumRevision\.current/);
+  assert.match(provider, /deleteCurriculumRequest\(configuration\.baseUrl, curriculumRevision\)/);
+  assert.match(provider, /removeCache:\s*async\s*\(emptyRevision\)\s*=>/);
+  assert.match(provider, /serializeEmptyCache\(emptyRevision\)/);
+  assert.match(provider, /currentCurriculumRevision\.current\s*=\s*emptyRevision/);
+  assert.match(provider, /const load = useCallback\(\(\) => operations\.current\.runMutation\(async \(\) =>/);
+  assert.match(provider, /commitPrepared\(\s*operation,/);
+  assert.doesNotMatch(provider, /commitLatest/);
+  assert.match(provider, /commitOperationFailure\(operations\.current, operation/);
+  assert.match(i18n, /même parcours exact/);
+  assert.match(i18n, /same exact learning path/);
 });

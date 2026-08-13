@@ -68,6 +68,7 @@ export type Progress = {
 };
 
 export type ScioData = {
+  curriculumRevision?: string;
   curriculum: Curriculum;
   exercises: Exercise[];
   cards: ReviewCard[];

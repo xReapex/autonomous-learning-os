@@ -1,6 +1,9 @@
 import { bearerToken, errorResponse, noStoreJson } from './scio-auth';
 import type { ScioSessionIdentity } from './scio-auth-store';
-import type { createScioUserDataStore } from './scio-user-data-store';
+import {
+  type createScioUserDataStore,
+  UserDataStoreError,
+} from './scio-user-data-store';
 import { validateMobileContent, type MobileContent } from './mobile-data-validation';
 
 type Dependencies = {
@@ -27,10 +30,10 @@ async function boundedJson(request: Request): Promise<unknown> {
   return JSON.parse(body) as unknown;
 }
 
-function emptyResponse(): Response {
+function emptyResponse(headers?: HeadersInit): Response {
   return new Response(null, {
     status: 204,
-    headers: { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' },
+    headers: { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache', ...headers },
   });
 }
 
@@ -45,30 +48,74 @@ function lessonIds(data: MobileContent): Set<string> {
   return new Set(data.curriculum.course.modules.flatMap((module) => module.lessons.map((lesson) => lesson.id)));
 }
 
+function mutationPrecondition(request: Request, data?: MobileContent):
+  | { expectedCurriculumRevision: string; fallbackCurriculum?: MobileContent }
+  | Response {
+  const match = /^"([a-f0-9]{64})"$/.exec(request.headers.get('if-match') ?? '');
+  if (!match) return errorResponse(428, 'curriculum_revision_required');
+  return {
+    expectedCurriculumRevision: match[1],
+    ...(data ? { fallbackCurriculum: data } : {}),
+  };
+}
+
+function stalePrecondition(
+  precondition: { expectedCurriculumRevision: string },
+  currentRevision: string,
+): Response | null {
+  return precondition.expectedCurriculumRevision === currentRevision
+    ? null
+    : errorResponse(412, 'curriculum_revision_mismatch');
+}
+
+function mutationError(error: unknown, fallbackCode: string): Response {
+  if (error instanceof UserDataStoreError && error.code === 'curriculum_revision_mismatch') {
+    return errorResponse(412, error.code);
+  }
+  return errorResponse(400, fallbackCode);
+}
+
 export function createMobileDataHandlers(dependencies: Dependencies) {
   async function requireIdentity(request: Request): Promise<ScioSessionIdentity | Response> {
     const resolved = await identity(request, dependencies);
     return resolved ?? errorResponse(401, 'session_unauthorized');
   }
 
-  async function contentFor(userId: string): Promise<MobileContent | null> {
+  async function curriculumStateFor(userId: string): Promise<{
+    content: MobileContent | null;
+    revision: string;
+  }> {
     const state = await dependencies.users.readCurriculumState(userId);
-    if (state.status === 'empty') return null;
-    if (state.status === 'custom') return validateMobileContent(state.curriculum);
-    return dependencies.loadDefaultData();
+    if (state.status === 'empty') return { content: null, revision: state.revision };
+    if (state.status === 'custom') {
+      return { content: validateMobileContent(state.curriculum), revision: state.revision };
+    }
+    const content = await dependencies.loadDefaultData();
+    return { content, revision: state.revision };
+  }
+
+  async function contentFor(userId: string): Promise<MobileContent | null> {
+    return (await curriculumStateFor(userId)).content;
   }
 
   return {
     async getCurriculum(request: Request): Promise<Response> {
       const session = await requireIdentity(request);
       if (session instanceof Response) return session;
-      const content = await contentFor(session.user.id);
-      return content ? noStoreJson(content.curriculum) : emptyResponse();
+      const state = await curriculumStateFor(session.user.id);
+      return state.content
+        ? noStoreJson(state.content.curriculum, { headers: { ETag: `"${state.revision}"` } })
+        : emptyResponse({ ETag: `"${state.revision}"` });
     },
 
     async putCurriculum(request: Request): Promise<Response> {
       const session = await requireIdentity(request);
       if (session instanceof Response) return session;
+      const requestedPrecondition = mutationPrecondition(request);
+      if (requestedPrecondition instanceof Response) return requestedPrecondition;
+      const state = await curriculumStateFor(session.user.id);
+      const stale = stalePrecondition(requestedPrecondition, state.revision);
+      if (stale) return stale;
       let value: unknown;
       try {
         value = await boundedJson(request);
@@ -77,9 +124,16 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
       }
       try {
         const content = validateMobileContent(value);
-        await dependencies.users.saveCurriculum(session.user.id, content);
-        return emptyResponse();
-      } catch {
+        const precondition = {
+          ...requestedPrecondition,
+          ...(state.content ? { fallbackCurriculum: state.content } : {}),
+        };
+        const revision = await dependencies.users.saveCurriculum(session.user.id, content, precondition);
+        return emptyResponse({ ETag: `"${revision}"` });
+      } catch (error) {
+        if (error instanceof UserDataStoreError && error.code === 'curriculum_revision_mismatch') {
+          return errorResponse(412, error.code);
+        }
         return errorResponse(422, 'invalid_curriculum');
       }
     },
@@ -87,11 +141,26 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
     async deleteCurriculum(request: Request): Promise<Response> {
       const session = await requireIdentity(request);
       if (session instanceof Response) return session;
-      const activeCurriculum = await contentFor(session.user.id);
+      const requestedPrecondition = mutationPrecondition(request);
+      if (requestedPrecondition instanceof Response) return requestedPrecondition;
+      const state = await curriculumStateFor(session.user.id);
+      const stale = stalePrecondition(requestedPrecondition, state.revision);
+      if (stale) return stale;
+      const precondition = {
+        ...requestedPrecondition,
+        ...(state.content ? { fallbackCurriculum: state.content } : {}),
+      };
       try {
-        await dependencies.users.clearCurriculum(session.user.id, activeCurriculum);
-        return emptyResponse();
-      } catch {
+        const revision = await dependencies.users.clearCurriculum(
+          session.user.id,
+          state.content ?? undefined,
+          precondition,
+        );
+        return emptyResponse({ ETag: `"${revision}"` });
+      } catch (error) {
+        if (error instanceof UserDataStoreError && error.code === 'curriculum_revision_mismatch') {
+          return errorResponse(412, error.code);
+        }
         return errorResponse(409, 'curriculum_archive_failed');
       }
     },
@@ -112,6 +181,11 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
     async patchProgress(request: Request): Promise<Response> {
       const session = await requireIdentity(request);
       if (session instanceof Response) return session;
+      const requestedPrecondition = mutationPrecondition(request);
+      if (requestedPrecondition instanceof Response) return requestedPrecondition;
+      const state = await curriculumStateFor(session.user.id);
+      const stale = stalePrecondition(requestedPrecondition, state.revision);
+      if (stale) return stale;
       let value: unknown;
       try {
         value = await boundedJson(request);
@@ -120,8 +194,9 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
       }
       if (!value || typeof value !== 'object') return errorResponse(400, 'invalid_mutation');
       const mutation = value as { eventId?: unknown; lessonId?: unknown; exerciseId?: unknown; status?: unknown };
-      const data = await contentFor(session.user.id);
+      const data = state.content;
       if (!data) return errorResponse(404, 'curriculum_not_found');
+      const precondition = { ...requestedPrecondition, fallbackCurriculum: data };
       if (mutation.status === 'completed' &&
           (typeof mutation.lessonId !== 'string' || !lessonIds(data).has(mutation.lessonId))) {
         return errorResponse(404, 'lesson_not_found');
@@ -131,18 +206,28 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
         return errorResponse(404, 'exercise_not_found');
       }
       try {
-        await dependencies.users.applyProgress(session.user.id, mutation as Parameters<Dependencies['users']['applyProgress']>[1]);
+        await dependencies.users.applyProgress(
+          session.user.id,
+          mutation as Parameters<Dependencies['users']['applyProgress']>[1],
+          precondition,
+        );
         return emptyResponse();
-      } catch {
-        return errorResponse(400, 'invalid_mutation');
+      } catch (error) {
+        return mutationError(error, 'invalid_mutation');
       }
     },
 
     async patchCard(request: Request, cardId: string): Promise<Response> {
       const session = await requireIdentity(request);
       if (session instanceof Response) return session;
-      const data = await contentFor(session.user.id);
+      const requestedPrecondition = mutationPrecondition(request);
+      if (requestedPrecondition instanceof Response) return requestedPrecondition;
+      const state = await curriculumStateFor(session.user.id);
+      const stale = stalePrecondition(requestedPrecondition, state.revision);
+      if (stale) return stale;
+      const data = state.content;
       if (!data) return errorResponse(404, 'curriculum_not_found');
+      const precondition = { ...requestedPrecondition, fallbackCurriculum: data };
       if (!data.cards.some((item) => item.id === cardId)) return errorResponse(404, 'card_not_found');
       let value: unknown;
       try {
@@ -154,16 +239,25 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
       const mutation = value as { eventId?: unknown; cardId?: unknown; result?: unknown };
       if (mutation.cardId !== cardId) return errorResponse(400, 'card_id_mismatch');
       try {
-        await dependencies.users.applyCard(session.user.id, mutation as Parameters<Dependencies['users']['applyCard']>[1]);
+        await dependencies.users.applyCard(
+          session.user.id,
+          mutation as Parameters<Dependencies['users']['applyCard']>[1],
+          precondition,
+        );
         return emptyResponse();
-      } catch {
-        return errorResponse(400, 'invalid_mutation');
+      } catch (error) {
+        return mutationError(error, 'invalid_mutation');
       }
     },
 
     async postNote(request: Request): Promise<Response> {
       const session = await requireIdentity(request);
       if (session instanceof Response) return session;
+      const requestedPrecondition = mutationPrecondition(request);
+      if (requestedPrecondition instanceof Response) return requestedPrecondition;
+      const state = await curriculumStateFor(session.user.id);
+      const stale = stalePrecondition(requestedPrecondition, state.revision);
+      if (stale) return stale;
       let value: unknown;
       try {
         value = await boundedJson(request);
@@ -172,16 +266,21 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
       }
       if (!value || typeof value !== 'object') return errorResponse(400, 'invalid_note');
       const note = value as { lessonId?: unknown; body?: unknown };
-      const data = await contentFor(session.user.id);
+      const data = state.content;
       if (!data) return errorResponse(404, 'curriculum_not_found');
+      const precondition = { ...requestedPrecondition, fallbackCurriculum: data };
       if (typeof note.lessonId !== 'string' || !lessonIds(data).has(note.lessonId)) {
         return errorResponse(404, 'lesson_not_found');
       }
       try {
-        await dependencies.users.saveNote(session.user.id, note as Parameters<Dependencies['users']['saveNote']>[1]);
+        await dependencies.users.saveNote(
+          session.user.id,
+          note as Parameters<Dependencies['users']['saveNote']>[1],
+          precondition,
+        );
         return emptyResponse();
-      } catch {
-        return errorResponse(400, 'invalid_note');
+      } catch (error) {
+        return mutationError(error, 'invalid_note');
       }
     },
   };

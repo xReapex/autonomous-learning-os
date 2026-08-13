@@ -15,19 +15,39 @@ export function createDataOperationCoordinator() {
       return operation === currentOperation;
     },
 
-    commit(operation: OperationId, write: () => Promise<void>): Promise<boolean> {
-      const task = async () => {
+    commit(operation: OperationId, publish: () => true): Promise<boolean> {
+      const task = () => {
         if (operation !== currentOperation) return false;
-        await write();
-        return operation === currentOperation;
+        publish();
+        return true;
       };
       const result = commitQueue.then(task, task);
       commitQueue = result.then(() => undefined, () => undefined);
       return result;
     },
 
-    commitLatest(write: () => Promise<void>): Promise<void> {
-      const result = commitQueue.then(write, write);
+    commitPrepared(
+      operation: OperationId,
+      prepare: () => Promise<void>,
+      publish: () => true,
+      rollback: () => Promise<void>,
+    ): Promise<boolean> {
+      const task = async () => {
+        if (operation !== currentOperation) return false;
+        try {
+          await prepare();
+        } catch (error) {
+          await rollback();
+          throw error;
+        }
+        if (operation !== currentOperation) {
+          await rollback();
+          return false;
+        }
+        publish();
+        return true;
+      };
+      const result = commitQueue.then(task, task);
       commitQueue = result.then(() => undefined, () => undefined);
       return result;
     },

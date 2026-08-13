@@ -1,12 +1,13 @@
 type CurriculumRemovalDependencies = {
-  removeRemote: () => Promise<void>;
-  removeCache: () => Promise<void>;
+  removeRemote: () => Promise<string>;
+  removeCache: (revision: string) => Promise<void>;
 };
 
 export async function removeCurriculumDurably({
   removeRemote,
   removeCache,
-}: CurriculumRemovalDependencies): Promise<void> {
-  await removeRemote();
-  await removeCache();
+}: CurriculumRemovalDependencies): Promise<string> {
+  const emptyRevision = await removeRemote();
+  await removeCache(emptyRevision);
+  return emptyRevision;
 }

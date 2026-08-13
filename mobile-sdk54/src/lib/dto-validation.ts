@@ -79,6 +79,9 @@ export function parseScioDataDto(value: unknown): ScioData {
     throw new Error('DTO_SCIO_DATA_INVALID');
   }
   return {
+    ...(typeof value.curriculumRevision === 'string' && /^"[a-f0-9]{64}"$/.test(value.curriculumRevision)
+      ? { curriculumRevision: value.curriculumRevision }
+      : {}),
     curriculum: parseCurriculumDto(value.curriculum),
     exercises: parseExercisesDto(value.exercises),
     cards: parseCardsDto(value.cards),
