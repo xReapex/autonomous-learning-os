@@ -264,6 +264,47 @@ describe('handlers de données mobile SCIO', () => {
     expect(progress.completedLessonIds).toEqual([]);
   });
 
+  it('restaure l’historique du curriculum par défaut recréé via le DTO public sans progression', async () => {
+    const token = 'token-a'.repeat(6);
+    const initial = await handlers.getCurriculum(request('curriculum', token));
+    const initialRevision = initial.headers.get('etag');
+    expect(initialRevision).toMatch(/^"[a-f0-9]{64}"$/);
+    const lessonId = defaultData.curriculum.course.modules[0].lessons[0].id;
+
+    expect((await handlers.patchProgress(request('progress', token, {
+      method: 'PATCH',
+      headers: { 'If-Match': initialRevision! },
+      body: JSON.stringify({
+        eventId: 'lesson:default:completed',
+        lessonId,
+        status: 'completed',
+      }),
+    }))).status).toBe(204);
+
+    const removed = await handlers.deleteCurriculum(request('curriculum', token, {
+      method: 'DELETE',
+      headers: { 'If-Match': initialRevision! },
+    }));
+    expect(removed.status).toBe(204);
+    const emptyRevision = removed.headers.get('etag');
+    expect(emptyRevision).toMatch(/^"[a-f0-9]{64}"$/);
+
+    const restored = await handlers.putCurriculum(request('curriculum', token, {
+      method: 'PUT',
+      headers: { 'If-Match': emptyRevision! },
+      body: JSON.stringify({
+        curriculum: defaultData.curriculum,
+        exercises: defaultData.exercises,
+        cards: defaultData.cards,
+      }),
+    }));
+    expect(restored.status).toBe(204);
+    expect(await (await handlers.getProgress(request('progress', token))).json()).toMatchObject({
+      completedLessonIds: [lessonId],
+      weeklyLessons: 1,
+    });
+  });
+
   it('retire uniquement le sujet actif, conserve son historique et sert ensuite un état vide', async () => {
     const tokenA = 'token-a'.repeat(6);
     const tokenB = 'token-b'.repeat(6);

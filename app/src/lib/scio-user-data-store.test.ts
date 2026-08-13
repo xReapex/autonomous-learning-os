@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +15,22 @@ const userB = 'usr_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 async function store() {
   return createScioUserDataStore({ dataDirectory: await mkdtemp(join(tmpdir(), 'scio-user-data-')) });
+}
+
+function legacyCanonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(legacyCanonicalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+        .map(([key, entry]) => [key, legacyCanonicalize(entry)]),
+    );
+  }
+  return value;
+}
+
+function legacyFingerprint(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(legacyCanonicalize(value))).digest('hex');
 }
 
 describe('stockage pédagogique SCIO par utilisateur', () => {
@@ -323,6 +340,272 @@ describe('stockage pédagogique SCIO par utilisateur', () => {
       completedLessonIds: ['lesson-one'],
       weeklyLessons: 1,
     });
+  });
+
+  it('ignore la projection de progression dans l’identité canonique du curriculum', () => {
+    const content = {
+      curriculum: { course: { id: 'cuisine', modules: [] } },
+      exercises: [],
+      cards: [],
+    };
+    expect(curriculumFingerprint({ ...content, progress: { completedLessonIds: ['mutable'] } }))
+      .toBe(curriculumFingerprint(content));
+  });
+
+  it.each([
+    { curriculum: { course: { id: 'missing-exercises' } }, cards: [] },
+    { curriculum: { course: { id: 'missing-cards' } }, exercises: [] },
+    { exercises: [], cards: [] },
+  ])('refuse une mutation durable sans les trois surfaces pédagogiques', async (incomplete) => {
+    const data = await store();
+
+    await expect(data.saveCurriculum(userA, incomplete)).rejects.toMatchObject({ code: 'mutation_invalid' });
+    await expect(data.clearCurriculum(userA, incomplete)).rejects.toMatchObject({ code: 'mutation_invalid' });
+  });
+
+  it.each([
+    { curriculum: { course: { id: 'missing-exercises' } }, cards: [] },
+    { curriculum: { course: { id: 'missing-cards' } }, exercises: [] },
+    { exercises: [], cards: [] },
+  ])('refuse un fallback de retrait incomplet même si un curriculum actif existe', async (incomplete) => {
+    const data = await store();
+    const active = {
+      curriculum: { course: { id: 'active', modules: [] } },
+      exercises: [],
+      cards: [],
+    };
+    await data.saveCurriculum(userA, active);
+
+    await expect(data.clearCurriculum(userA, incomplete)).rejects.toMatchObject({ code: 'mutation_invalid' });
+    await expect(data.readCurriculum(userA)).resolves.toEqual(active);
+
+    await data.clearCurriculum(userA, active);
+    await expect(data.clearCurriculum(userA, incomplete)).rejects.toMatchObject({ code: 'mutation_invalid' });
+    await expect(data.readCurriculumState(userA)).resolves.toMatchObject({ status: 'empty' });
+  });
+
+  it('priorise une révision obsolète avant la validation du fallback de retrait', async () => {
+    const data = await store();
+    const active = {
+      curriculum: { course: { id: 'active', modules: [] } },
+      exercises: [],
+      cards: [],
+    };
+    const currentRevision = await data.saveCurriculum(userA, active);
+
+    await expect(data.clearCurriculum(userA, { curriculum: active.curriculum }, {
+      expectedCurriculumRevision: 'f'.repeat(64),
+      fallbackCurriculum: active,
+    })).rejects.toMatchObject({ code: 'curriculum_revision_mismatch' });
+    await expect(data.readCurriculumState(userA)).resolves.toMatchObject({
+      status: 'custom',
+      revision: currentRevision,
+    });
+  });
+
+  it('rejette une archive canonique enrichie par une projection top-level non authentifiée', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-canonical-extra-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    const content = {
+      curriculum: { course: { id: 'cuisine', modules: [] } },
+      exercises: [],
+      cards: [],
+    };
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: [],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 0,
+        weeklyReviews: 0,
+      },
+      processedEventIds: [],
+      notes: [],
+      curriculum: null,
+      curriculumCleared: true,
+      curriculumRevision: 'a'.repeat(64),
+      archivedCurricula: [{
+        courseId: 'cuisine',
+        fingerprint: curriculumFingerprint(content),
+        curriculum: { ...content, progress: { completedLessonIds: ['falsified'] } },
+        progress: {
+          completedLessonIds: [],
+          passedExerciseIds: [],
+          recalledCardIds: [],
+          weeklyLessons: 0,
+          weeklyReviews: 0,
+        },
+        processedEventIds: [],
+        notes: [],
+      }],
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    await expect(data.readCurriculumState(userA)).rejects.toMatchObject({ code: 'storage_invalid' });
+  });
+
+  it.each(['curriculumRevision', 'arbitrary'])('rejette un faux format legacy enrichi par %s même si son hash complet correspond', async (extraKey) => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-invalid-legacy-extra-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    const content = {
+      curriculum: { course: { id: 'cuisine', modules: [] } },
+      exercises: [],
+      cards: [],
+      [extraKey]: extraKey === 'curriculumRevision' ? 'b'.repeat(64) : { injected: true },
+    };
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: [],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 0,
+        weeklyReviews: 0,
+      },
+      processedEventIds: [],
+      notes: [],
+      curriculum: null,
+      curriculumCleared: true,
+      curriculumRevision: 'a'.repeat(64),
+      archivedCurricula: [{
+        courseId: 'cuisine',
+        fingerprint: legacyFingerprint(content),
+        curriculum: content,
+        progress: {
+          completedLessonIds: [],
+          passedExerciseIds: [],
+          recalledCardIds: [],
+          weeklyLessons: 0,
+          weeklyReviews: 0,
+        },
+        processedEventIds: [],
+        notes: [],
+      }],
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    await expect(data.readCurriculumState(userA)).rejects.toMatchObject({ code: 'storage_invalid' });
+  });
+
+  it.each([
+    {
+      completedLessonIds: [42],
+      passedExerciseIds: [],
+      recalledCardIds: [],
+      weeklyLessons: 0,
+      weeklyReviews: 0,
+    },
+    {
+      completedLessonIds: [],
+      passedExerciseIds: [],
+      recalledCardIds: [],
+      weeklyLessons: -1,
+      weeklyReviews: 0,
+    },
+  ])('rejette un progress legacy structurellement invalide même si son hash complet correspond', async (legacyProgress) => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-invalid-legacy-progress-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    const content = {
+      curriculum: { course: { id: 'cuisine', modules: [] } },
+      exercises: [],
+      cards: [],
+      progress: legacyProgress,
+    };
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: [],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 0,
+        weeklyReviews: 0,
+      },
+      processedEventIds: [],
+      notes: [],
+      curriculum: null,
+      curriculumCleared: true,
+      curriculumRevision: 'a'.repeat(64),
+      archivedCurricula: [{
+        courseId: 'cuisine',
+        fingerprint: legacyFingerprint(content),
+        curriculum: content,
+        progress: {
+          completedLessonIds: [],
+          passedExerciseIds: [],
+          recalledCardIds: [],
+          weeklyLessons: 0,
+          weeklyReviews: 0,
+        },
+        processedEventIds: [],
+        notes: [],
+      }],
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    await expect(data.readCurriculumState(userA)).rejects.toMatchObject({ code: 'storage_invalid' });
+  });
+
+  it('restaure une archive historique dont le hash incluait la projection de progression', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-legacy-archive-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    const content = {
+      curriculum: { course: { id: 'cuisine', modules: [{ lessons: [{ id: 'lesson-one' }] }] } },
+      exercises: [],
+      cards: [],
+    };
+    const historicalCurriculum = {
+      ...content,
+      progress: {
+        completedLessonIds: [],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 0,
+        weeklyReviews: 0,
+      },
+    };
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: [],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 0,
+        weeklyReviews: 0,
+      },
+      processedEventIds: [],
+      notes: [],
+      curriculum: null,
+      curriculumCleared: true,
+      curriculumRevision: 'a'.repeat(64),
+      archivedCurricula: [{
+        courseId: 'cuisine',
+        fingerprint: legacyFingerprint(historicalCurriculum),
+        curriculum: historicalCurriculum,
+        progress: {
+          completedLessonIds: ['lesson-one'],
+          passedExerciseIds: [],
+          recalledCardIds: [],
+          weeklyLessons: 1,
+          weeklyReviews: 0,
+        },
+        processedEventIds: ['lesson:one:completed'],
+        notes: [{ lessonId: 'lesson-one', body: 'Historique.' }],
+      }],
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    await data.saveCurriculum(userA, content, { expectedCurriculumRevision: 'a'.repeat(64) });
+
+    expect(await data.readProgress(userA)).toMatchObject({
+      completedLessonIds: ['lesson-one'],
+      weeklyLessons: 1,
+    });
+    expect(await data.readNotes(userA)).toEqual([{ lessonId: 'lesson-one', body: 'Historique.' }]);
   });
 
   it('ne confond pas deux versions sous le même ID et conserve l’archive d’origine', async () => {

@@ -109,8 +109,61 @@ function canonicalize(value: unknown): unknown {
   return value;
 }
 
-export function curriculumFingerprint(curriculum: unknown): string {
+function curriculumContent(value: unknown): Record<'curriculum' | 'exercises' | 'cards', unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  if (!candidate.curriculum || typeof candidate.curriculum !== 'object' ||
+      Array.isArray(candidate.curriculum) || !Array.isArray(candidate.exercises) ||
+      !Array.isArray(candidate.cards)) return null;
+  return {
+    curriculum: candidate.curriculum,
+    exercises: candidate.exercises,
+    cards: candidate.cards,
+  };
+}
+
+function requireCurriculumContent(value: unknown): Record<'curriculum' | 'exercises' | 'cards', unknown> {
+  const content = curriculumContent(value);
+  if (!content) throw new UserDataStoreError('mutation_invalid');
+  return content;
+}
+
+function isCanonicalCurriculumDocument(value: unknown): boolean {
+  if (!curriculumContent(value)) return false;
+  return Object.keys(value as Record<string, unknown>)
+    .sort()
+    .join(',') === 'cards,curriculum,exercises';
+}
+
+function isProgress(value: unknown): value is Progress {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const progress = value as Record<string, unknown>;
+  const validIds = (candidate: unknown) => Array.isArray(candidate) &&
+    candidate.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 200);
+  return Object.keys(progress).sort().join(',') ===
+      'completedLessonIds,passedExerciseIds,recalledCardIds,weeklyLessons,weeklyReviews' &&
+    validIds(progress.completedLessonIds) && validIds(progress.passedExerciseIds) &&
+    validIds(progress.recalledCardIds) && Number.isInteger(progress.weeklyLessons) &&
+    (progress.weeklyLessons as number) >= 0 && Number.isInteger(progress.weeklyReviews) &&
+    (progress.weeklyReviews as number) >= 0;
+}
+
+function isLegacyCurriculumDocument(value: unknown): boolean {
+  if (!curriculumContent(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return Object.keys(candidate).sort().join(',') === 'cards,curriculum,exercises,progress' &&
+    isProgress(candidate.progress);
+}
+
+function legacyCurriculumFingerprint(curriculum: unknown): string {
   return createHash('sha256').update(JSON.stringify(canonicalize(curriculum))).digest('hex');
+}
+
+export function curriculumFingerprint(curriculum: unknown): string {
+  const content = curriculumContent(curriculum) ?? curriculum;
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalize(content)))
+    .digest('hex');
 }
 
 const legacyEmptyCurriculumRevision = createHash('sha256')
@@ -141,18 +194,16 @@ function assertCurriculumPrecondition(
 function isArchivedCurriculum(value: unknown): value is ArchivedCurriculum {
   if (!value || typeof value !== 'object') return false;
   const archive = value as Partial<ArchivedCurriculum>;
-  const progress = archive.progress as Partial<Progress> | undefined;
+  const canonicalArchive = isCanonicalCurriculumDocument(archive.curriculum) &&
+    curriculumFingerprint(archive.curriculum) === archive.fingerprint;
+  const legacyArchive = isLegacyCurriculumDocument(archive.curriculum) &&
+    legacyCurriculumFingerprint(archive.curriculum) === archive.fingerprint;
   return typeof archive.courseId === 'string' && archive.courseId.length > 0 && archive.courseId.length <= 200 &&
     typeof archive.fingerprint === 'string' && /^[a-f0-9]{64}$/.test(archive.fingerprint) &&
     !!archive.curriculum && typeof archive.curriculum === 'object' && !Array.isArray(archive.curriculum) &&
     courseIdFor(archive.curriculum) === archive.courseId &&
-    curriculumFingerprint(archive.curriculum) === archive.fingerprint &&
-    !!progress &&
-    Array.isArray(progress.completedLessonIds) &&
-    Array.isArray(progress.passedExerciseIds) &&
-    Array.isArray(progress.recalledCardIds) &&
-    Number.isInteger(progress.weeklyLessons) &&
-    Number.isInteger(progress.weeklyReviews) &&
+    (canonicalArchive || legacyArchive) &&
+    isProgress(archive.progress) &&
     Array.isArray(archive.processedEventIds) &&
     Array.isArray(archive.notes);
 }
@@ -164,13 +215,8 @@ function assertUserId(userId: string): void {
 function isStoredData(value: unknown): value is StoredUserData {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<StoredUserData>;
-  const progress = candidate.progress as Partial<Progress> | undefined;
-  return candidate.version === 1 && !!progress &&
-    Array.isArray(progress.completedLessonIds) &&
-    Array.isArray(progress.passedExerciseIds) &&
-    Array.isArray(progress.recalledCardIds) &&
-    Number.isInteger(progress.weeklyLessons) &&
-    Number.isInteger(progress.weeklyReviews) &&
+  const progress = candidate.progress;
+  return candidate.version === 1 && isProgress(progress) &&
     Array.isArray(candidate.processedEventIds) &&
     Array.isArray(candidate.notes) &&
     (candidate.curriculumCleared === undefined || typeof candidate.curriculumCleared === 'boolean') &&
@@ -183,8 +229,8 @@ function isStoredData(value: unknown): value is StoredUserData {
       progress.completedLessonIds.length > 0 ||
       progress.passedExerciseIds.length > 0 ||
       progress.recalledCardIds.length > 0 ||
-      (progress.weeklyLessons as number) > 0 ||
-      (progress.weeklyReviews as number) > 0 ||
+      progress.weeklyLessons > 0 ||
+      progress.weeklyReviews > 0 ||
       candidate.processedEventIds.length > 0 ||
       candidate.notes.length > 0
     )) &&
@@ -334,12 +380,13 @@ export function createScioUserDataStore({ dataDirectory }: { dataDirectory: stri
         await assertWritableUser(userId);
         const data = await readData(file);
         assertCurriculumPrecondition(data, precondition);
-        const { lessonIds, exerciseIds, cardIds } = curriculumObjectIds(curriculum);
-        const courseId = courseIdFor(curriculum);
-        const fingerprint = curriculumFingerprint(curriculum);
+        const content = requireCurriculumContent(curriculum);
+        const { lessonIds, exerciseIds, cardIds } = curriculumObjectIds(content);
+        const courseId = courseIdFor(content);
+        const fingerprint = curriculumFingerprint(content);
         const archivedIndex = courseId
           ? (data.archivedCurricula ?? []).findIndex((archive) =>
-              archive.courseId === courseId && archive.fingerprint === fingerprint)
+              archive.courseId === courseId && curriculumFingerprint(archive.curriculum) === fingerprint)
           : -1;
         if (archivedIndex >= 0) {
           const [archive] = (data.archivedCurricula ?? []).splice(archivedIndex, 1);
@@ -347,7 +394,7 @@ export function createScioUserDataStore({ dataDirectory }: { dataDirectory: stri
           data.processedEventIds = archive.processedEventIds;
           data.notes = archive.notes;
         }
-        data.curriculum = curriculum;
+        data.curriculum = content;
         data.curriculumCleared = false;
         data.curriculumRevision = nextCurriculumRevision();
         data.progress.completedLessonIds = data.progress.completedLessonIds.filter((id) => lessonIds.has(id));
@@ -369,11 +416,16 @@ export function createScioUserDataStore({ dataDirectory }: { dataDirectory: stri
         await assertWritableUser(userId);
         const data = await readData(file);
         assertCurriculumPrecondition(data, precondition);
+        if (fallbackCurriculum !== undefined) requireCurriculumContent(fallbackCurriculum);
         if (data.curriculumCleared) return curriculumRevision(data) as string;
-        const curriculum = data.curriculum ?? fallbackCurriculum ?? null;
-        if (!curriculum && hasPedagogicalData(data)) {
-          throw new UserDataStoreError('mutation_invalid');
+        const candidate = data.curriculum ?? fallbackCurriculum ?? null;
+        if (!candidate && !hasPedagogicalData(data)) {
+          data.curriculumCleared = true;
+          data.curriculumRevision = nextCurriculumRevision();
+          await writeData(file, data);
+          return data.curriculumRevision;
         }
+        const curriculum = requireCurriculumContent(candidate);
         const courseId = courseIdFor(curriculum);
         if (curriculum && !courseId) throw new UserDataStoreError('mutation_invalid');
         if (curriculum && courseId) {
