@@ -1,3 +1,4 @@
+import { type Href, useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -307,12 +308,32 @@ export function DataGate({
   const { t } = useLocale();
   const { data, status, errorKey, retry } = useScioData();
   const fluid = useFluidLayout();
+  const router = useRouter();
 
   if (status === 'loading' && !data) {
     return (
       <AppScreen>
         <View style={styles.stateContainer}>
           <BrandLoader caption={t('common.loading')} />
+        </View>
+      </AppScreen>
+    );
+  }
+
+  if (status === 'empty') {
+    return (
+      <AppScreen>
+        <View style={styles.stateContainer}>
+          <View style={[styles.stateIcon, styles.emptyStateIcon, { width: fluid.controlSize * 1.2, aspectRatio: 1 }]}>
+            <AppIcon name="route" size={fluid.controlSize * 0.58} color={palette.primaryText} />
+          </View>
+          <Text style={styles.stateTitle}>{t('curriculum.emptyTitle')}</Text>
+          <Text style={styles.stateBody}>{t('curriculum.emptyBody')}</Text>
+          <Button
+            label={t('curriculum.create')}
+            icon="arrow-right"
+            onPress={() => router.push('/create-course' as Href)}
+          />
         </View>
       </AppScreen>
     );
@@ -502,6 +523,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  emptyStateIcon: { backgroundColor: palette.primarySoft },
   stateTitle: {
     color: palette.ink,
     fontFamily: typography.title,

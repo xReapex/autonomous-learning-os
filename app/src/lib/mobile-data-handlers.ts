@@ -51,16 +51,19 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
     return resolved ?? errorResponse(401, 'session_unauthorized');
   }
 
-  async function contentFor(userId: string): Promise<MobileContent> {
-    const stored = await dependencies.users.readCurriculum(userId);
-    return stored ? validateMobileContent(stored) : dependencies.loadDefaultData();
+  async function contentFor(userId: string): Promise<MobileContent | null> {
+    const state = await dependencies.users.readCurriculumState(userId);
+    if (state.status === 'empty') return null;
+    if (state.status === 'custom') return validateMobileContent(state.curriculum);
+    return dependencies.loadDefaultData();
   }
 
   return {
     async getCurriculum(request: Request): Promise<Response> {
       const session = await requireIdentity(request);
       if (session instanceof Response) return session;
-      return noStoreJson((await contentFor(session.user.id)).curriculum);
+      const content = await contentFor(session.user.id);
+      return content ? noStoreJson(content.curriculum) : emptyResponse();
     },
 
     async putCurriculum(request: Request): Promise<Response> {
@@ -81,11 +84,23 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
       }
     },
 
+    async deleteCurriculum(request: Request): Promise<Response> {
+      const session = await requireIdentity(request);
+      if (session instanceof Response) return session;
+      const activeCurriculum = await contentFor(session.user.id);
+      try {
+        await dependencies.users.clearCurriculum(session.user.id, activeCurriculum);
+        return emptyResponse();
+      } catch {
+        return errorResponse(409, 'curriculum_archive_failed');
+      }
+    },
+
     async getCards(request: Request): Promise<Response> {
       const session = await requireIdentity(request);
       if (session instanceof Response) return session;
       const data = await contentFor(session.user.id);
-      return noStoreJson({ cards: data.cards, exercises: data.exercises });
+      return noStoreJson({ cards: data?.cards ?? [], exercises: data?.exercises ?? [] });
     },
 
     async getProgress(request: Request): Promise<Response> {
@@ -106,6 +121,7 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
       if (!value || typeof value !== 'object') return errorResponse(400, 'invalid_mutation');
       const mutation = value as { eventId?: unknown; lessonId?: unknown; exerciseId?: unknown; status?: unknown };
       const data = await contentFor(session.user.id);
+      if (!data) return errorResponse(404, 'curriculum_not_found');
       if (mutation.status === 'completed' &&
           (typeof mutation.lessonId !== 'string' || !lessonIds(data).has(mutation.lessonId))) {
         return errorResponse(404, 'lesson_not_found');
@@ -126,6 +142,7 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
       const session = await requireIdentity(request);
       if (session instanceof Response) return session;
       const data = await contentFor(session.user.id);
+      if (!data) return errorResponse(404, 'curriculum_not_found');
       if (!data.cards.some((item) => item.id === cardId)) return errorResponse(404, 'card_not_found');
       let value: unknown;
       try {
@@ -156,6 +173,7 @@ export function createMobileDataHandlers(dependencies: Dependencies) {
       if (!value || typeof value !== 'object') return errorResponse(400, 'invalid_note');
       const note = value as { lessonId?: unknown; body?: unknown };
       const data = await contentFor(session.user.id);
+      if (!data) return errorResponse(404, 'curriculum_not_found');
       if (typeof note.lessonId !== 'string' || !lessonIds(data).has(note.lessonId)) {
         return errorResponse(404, 'lesson_not_found');
       }

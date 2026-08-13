@@ -1,6 +1,6 @@
 import { AppIcon } from '@/components/app-icon';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   AppScreen,
@@ -15,6 +15,7 @@ import {
 import { YouTubeVideo } from '@/components/youtube-video';
 import { layout, palette, radius, spacing, typography } from '@/constants/theme';
 import { rewardAfterDurableMutation } from '@/lib/durable-reward';
+import { requestDestructiveConfirmation } from '@/lib/destructive-confirmation';
 import { haptics } from '@/lib/haptics';
 import { clearLessonDraft, updateLessonDraft } from '@/lib/lesson-drafts';
 import { resolveContentLocale } from '@/lib/content-locale';
@@ -28,7 +29,7 @@ import { localize, type Lesson } from '@/types/scio';
 
 export default function CoursesScreen() {
   const { locale, t } = useLocale();
-  const { completeLesson, saveNote } = useScioData();
+  const { completeLesson, removeActiveCurriculum, saveNote } = useScioData();
   const { grant } = useRewards();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
@@ -46,6 +47,36 @@ export default function CoursesScreen() {
         const lessonIds = new Set(lessons.map(({ id }) => id));
         const completedIds = [...new Set(data.progress.completedLessonIds.filter((id) => lessonIds.has(id)))];
         const percent = lessons.length ? Math.round((completedIds.length / lessons.length) * 100) : 0;
+
+        const removeSubject = async () => {
+          await mutationLock.current.run(async () => {
+            setMutationKey('curriculum:delete');
+            try {
+              const removed = await removeActiveCurriculum();
+              if (removed) {
+                haptics.success();
+              } else {
+                setMessage({ text: t('curriculum.removeError'), success: false });
+              }
+            } finally {
+              setMutationKey(null);
+            }
+          });
+        };
+
+        const confirmRemoveSubject = () => {
+          requestDestructiveConfirmation({
+            platform: Platform.OS === 'web' ? 'web' : 'native',
+            title: t('curriculum.removeConfirmTitle'),
+            body: t('curriculum.removeConfirmBody'),
+            cancelLabel: t('common.cancel'),
+            confirmLabel: t('curriculum.remove'),
+            action: () => void removeSubject(),
+            webConfirm: (confirmation) =>
+              typeof globalThis.confirm === 'function' && globalThis.confirm(confirmation),
+            nativeAlert: (title, body, buttons) => Alert.alert(title, body, buttons),
+          });
+        };
 
         const finishLesson = async (lesson: Lesson) => {
           if (completedIds.includes(lesson.id)) return;
@@ -100,6 +131,14 @@ export default function CoursesScreen() {
                 accessibilityLabel={t('a11y.progress', { value: percent })}
               />
             </View>
+            <Button
+              busy={mutationKey === 'curriculum:delete'}
+              disabled={mutationKey !== null}
+              icon="delete"
+              label={t('curriculum.remove')}
+              onPress={confirmRemoveSubject}
+              variant="danger"
+            />
 
             {message ? (
               <Pressable

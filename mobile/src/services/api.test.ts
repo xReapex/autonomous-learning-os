@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { authAccessTokenKey } from '../lib/secure-store-keys';
-import { ApiError, getCurriculum, replaceCurriculum } from './api';
+import { ApiError, deleteCurriculum, getCurriculum, replaceCurriculum } from './api';
 import { demoData } from './demo-data';
 
 const secureStore = vi.hoisted(() => ({ getItemAsync: vi.fn() }));
@@ -44,6 +44,23 @@ describe('API de données mobile', () => {
       cards: demoData.cards,
     });
     expect(body).not.toHaveProperty('progress');
+  });
+
+  it('représente explicitement un compte sans sujet actif', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(getCurriculum('https://learning.scio.app/api')).resolves.toBeNull();
+  });
+
+  it('supprime le sujet actif avec la session SCIO', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await deleteCurriculum('https://learning.scio.app/api');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://learning.scio.app/api/mobile/data/curriculum',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
   });
 
   it('distingue la limitation de débit d’une panne serveur', async () => {

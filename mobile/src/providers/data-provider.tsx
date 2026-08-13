@@ -16,10 +16,13 @@ import {
   dataFailureState,
   type ActivationErrorCode,
 } from '@/lib/data-provider-errors';
+import { createDataOperationCoordinator } from '@/lib/data-operation-coordinator';
+import { removeCurriculumDurably } from '@/lib/curriculum-removal';
 import { parseScioDataDto } from '@/lib/dto-validation';
 import { mutateThenRefresh } from '@/lib/durable-refresh';
 import {
   createNote,
+  deleteCurriculum as deleteCurriculumRequest,
   getApiConfiguration,
   getCards,
   getCurriculum,
@@ -31,7 +34,7 @@ import {
 } from '@/services/api';
 import type { ScioData } from '@/types/scio';
 
-type DataStatus = 'loading' | 'ready' | 'offline' | 'error';
+type DataStatus = 'loading' | 'ready' | 'empty' | 'offline' | 'error';
 type DataSource = 'generated' | 'api' | 'cache';
 
 type DataState = {
@@ -50,6 +53,7 @@ type DataContextValue = DataState & {
   passExercise: (exerciseId: string, eventId: string) => Promise<boolean>;
   reviewCard: (cardId: string, eventId: string, recalled: boolean) => Promise<boolean>;
   saveNote: (note: NoteMutation) => Promise<boolean>;
+  removeActiveCurriculum: () => Promise<boolean>;
 };
 
 const dataCacheKey = 'scio:data-cache';
@@ -65,9 +69,10 @@ async function readCache(): Promise<ScioData | null> {
   }
 }
 
-async function fetchAuthoritativeData(baseUrl: string): Promise<ScioData> {
-  const [curriculum, cardPayload, progress] = await Promise.all([
-    getCurriculum(baseUrl),
+async function fetchAuthoritativeData(baseUrl: string): Promise<ScioData | null> {
+  const curriculum = await getCurriculum(baseUrl);
+  if (!curriculum) return null;
+  const [cardPayload, progress] = await Promise.all([
     getCards(baseUrl),
     getProgress(baseUrl),
   ]);
@@ -91,42 +96,58 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   });
   const mounted = useRef(true);
   const lastConnection = useRef<boolean | null>(null);
+  const operations = useRef(createDataOperationCoordinator());
 
   const load = useCallback(async () => {
+    const operation = operations.current.start();
     setState((current) => ({ ...current, status: 'loading', errorKey: null }));
     try {
       const configuration = getApiConfiguration();
       const network = await NetInfo.fetch();
       if (network.isConnected === false) {
         const cached = await readCache();
-        if (mounted.current) {
-          setState({
-            status: 'offline',
-            source: cached ? 'cache' : 'api',
-            data: cached,
-            errorKey: 'status.error.network',
-          });
-        }
+        await operations.current.commit(operation, async () => {
+          if (mounted.current) {
+            setState({
+              status: 'offline',
+              source: cached ? 'cache' : 'api',
+              data: cached,
+              errorKey: 'status.error.network',
+            });
+          }
+        });
         return false;
       }
 
       const data = await fetchAuthoritativeData(configuration.baseUrl);
-      await AsyncStorage.setItem(dataCacheKey, JSON.stringify(data));
-      if (mounted.current) {
-        setState({ status: 'ready', source: 'api', data, errorKey: null });
-      }
-      return true;
-    } catch (error) {
-      const cached = await readCache();
-      const failure = dataFailureState(error);
-      if (mounted.current) {
-        setState({
-          status: failure.status,
-          source: cached ? 'cache' : 'api',
-          data: cached,
-          errorKey: failure.errorKey,
+      if (!data) {
+        return operations.current.commit(operation, async () => {
+          await AsyncStorage.removeItem(dataCacheKey);
+          if (mounted.current) {
+            setState({ status: 'empty', source: 'api', data: null, errorKey: null });
+          }
         });
       }
+      return operations.current.commit(operation, async () => {
+        await AsyncStorage.setItem(dataCacheKey, JSON.stringify(data));
+        if (mounted.current) {
+          setState({ status: 'ready', source: 'api', data, errorKey: null });
+        }
+      });
+    } catch (error) {
+      if (!operations.current.isCurrent(operation)) return false;
+      const cached = await readCache();
+      const failure = dataFailureState(error);
+      await operations.current.commit(operation, async () => {
+        if (mounted.current) {
+          setState({
+            status: failure.status,
+            source: cached ? 'cache' : 'api',
+            data: cached,
+            errorKey: failure.errorKey,
+          });
+        }
+      });
       return false;
     }
   }, []);
@@ -153,23 +174,31 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [load]);
 
   const activateGeneratedCurriculum = useCallback(async (candidate: ScioData) => {
-    try {
-      const validated = parseScioDataDto(candidate);
-      const configuration = getApiConfiguration();
-      await replaceCurriculum(configuration.baseUrl, validated);
-      const data = await fetchAuthoritativeData(configuration.baseUrl);
-      await AsyncStorage.setItem(dataCacheKey, JSON.stringify(data));
-      if (mounted.current) {
-        setState({ status: 'ready', source: 'api', data, errorKey: null });
+    const validated = parseScioDataDto(candidate);
+    const configuration = getApiConfiguration();
+    return operations.current.runMutation(async () => {
+      try {
+        operations.current.start();
+        await replaceCurriculum(configuration.baseUrl, validated);
+        const data = await fetchAuthoritativeData(configuration.baseUrl);
+        if (!data) throw new Error('curriculum_missing_after_activation');
+        operations.current.start();
+        await operations.current.commitLatest(async () => {
+          await AsyncStorage.setItem(dataCacheKey, JSON.stringify(data));
+          if (mounted.current) {
+            setState({ status: 'ready', source: 'api', data, errorKey: null });
+          }
+        });
+        return { ok: true } as const;
+      } catch (error) {
+        const failure = dataFailureState(error);
+        operations.current.start();
+        await operations.current.commitLatest(async () => {
+          if (mounted.current) setState((current) => ({ ...current, ...failure }));
+        });
+        return { ok: false, code: activationErrorCode(error) } as const;
       }
-      return { ok: true } as const;
-    } catch (error) {
-      const failure = dataFailureState(error);
-      if (mounted.current) {
-        setState((current) => ({ ...current, ...failure }));
-      }
-      return { ok: false, code: activationErrorCode(error) } as const;
-    }
+    });
   }, []);
 
   const sync = useCallback(async (operation: (baseUrl: string) => Promise<void>) => {
@@ -218,6 +247,35 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [sync],
   );
 
+  const removeActiveCurriculum = useCallback(async () => {
+    const configuration = getApiConfiguration();
+    return operations.current.runMutation(async () => {
+      try {
+        operations.current.start();
+        await removeCurriculumDurably({
+          removeRemote: () => deleteCurriculumRequest(configuration.baseUrl),
+          removeCache: async () => {
+            operations.current.start();
+            await operations.current.commitLatest(async () => {
+              await AsyncStorage.removeItem(dataCacheKey);
+              if (mounted.current) {
+                setState({ status: 'empty', source: 'api', data: null, errorKey: null });
+              }
+            });
+          },
+        });
+        return true;
+      } catch (error) {
+        const failure = dataFailureState(error);
+        operations.current.start();
+        await operations.current.commitLatest(async () => {
+          if (mounted.current) setState((current) => ({ ...current, ...failure }));
+        });
+        return false;
+      }
+    });
+  }, []);
+
   const value = useMemo<DataContextValue>(
     () => ({
       ...state,
@@ -227,8 +285,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       passExercise,
       reviewCard,
       saveNote,
+      removeActiveCurriculum,
     }),
-    [activateGeneratedCurriculum, completeLesson, load, passExercise, reviewCard, saveNote, state],
+    [activateGeneratedCurriculum, completeLesson, load, passExercise, removeActiveCurriculum, reviewCard, saveNote, state],
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

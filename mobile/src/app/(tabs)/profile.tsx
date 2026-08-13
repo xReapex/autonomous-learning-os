@@ -7,7 +7,6 @@ import {
   BentoGrid,
   BentoTile,
   Button,
-  DataGate,
   Metric,
   ProgressBar,
   Reveal,
@@ -81,9 +80,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <DataGate>
-      {() => (
-        <AppScreen>
+    <AppScreen>
           <ScreenHeader
             eyebrow={t('profile.eyebrow')}
             title={t('profile.title')}
@@ -272,9 +269,7 @@ export default function ProfileScreen() {
             </Surface>
           </Reveal>
           <Text style={styles.version}>{t('profile.version')}</Text>
-        </AppScreen>
-      )}
-    </DataGate>
+    </AppScreen>
   );
 }
 

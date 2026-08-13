@@ -10,3 +10,7 @@ export async function GET(request: Request): Promise<Response> {
 export async function PUT(request: Request): Promise<Response> {
   return mobileDataHandlersFromEnvironment().putCurriculum(request);
 }
+
+export async function DELETE(request: Request): Promise<Response> {
+  return mobileDataHandlersFromEnvironment().deleteCurriculum(request);
+}

@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { withInterprocessFileLock } from './interprocess-file-lock';
 
@@ -27,12 +27,23 @@ type CardMutation = {
 
 type Note = { lessonId: string; body: string };
 
+type ArchivedCurriculum = {
+  courseId: string;
+  fingerprint: string;
+  curriculum: unknown;
+  progress: Progress;
+  processedEventIds: string[];
+  notes: Note[];
+};
+
 type StoredUserData = {
   version: 1;
   progress: Progress;
   processedEventIds: string[];
   notes: Note[];
   curriculum: unknown | null;
+  curriculumCleared?: boolean;
+  archivedCurricula?: ArchivedCurriculum[];
 };
 
 export class UserDataStoreError extends Error {
@@ -67,7 +78,50 @@ function emptyData(): StoredUserData {
     processedEventIds: [],
     notes: [],
     curriculum: null,
+    curriculumCleared: false,
+    archivedCurricula: [],
   };
+}
+
+function courseIdFor(curriculum: unknown): string | null {
+  const value = curriculum as { curriculum?: { course?: { id?: unknown } } };
+  const courseId = value?.curriculum?.course?.id;
+  return typeof courseId === 'string' && courseId.length > 0 && courseId.length <= 200
+    ? courseId
+    : null;
+}
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+        .map(([key, entry]) => [key, canonicalize(entry)]),
+    );
+  }
+  return value;
+}
+
+function curriculumFingerprint(curriculum: unknown): string {
+  return createHash('sha256').update(JSON.stringify(canonicalize(curriculum))).digest('hex');
+}
+
+function isArchivedCurriculum(value: unknown): value is ArchivedCurriculum {
+  if (!value || typeof value !== 'object') return false;
+  const archive = value as Partial<ArchivedCurriculum>;
+  const progress = archive.progress as Partial<Progress> | undefined;
+  return typeof archive.courseId === 'string' && archive.courseId.length > 0 && archive.courseId.length <= 200 &&
+    typeof archive.fingerprint === 'string' && /^[a-f0-9]{64}$/.test(archive.fingerprint) &&
+    !!archive.curriculum && typeof archive.curriculum === 'object' && !Array.isArray(archive.curriculum) &&
+    !!progress &&
+    Array.isArray(progress.completedLessonIds) &&
+    Array.isArray(progress.passedExerciseIds) &&
+    Array.isArray(progress.recalledCardIds) &&
+    Number.isInteger(progress.weeklyLessons) &&
+    Number.isInteger(progress.weeklyReviews) &&
+    Array.isArray(archive.processedEventIds) &&
+    Array.isArray(archive.notes);
 }
 
 function assertUserId(userId: string): void {
@@ -86,6 +140,9 @@ function isStoredData(value: unknown): value is StoredUserData {
     Number.isInteger(progress.weeklyReviews) &&
     Array.isArray(candidate.processedEventIds) &&
     Array.isArray(candidate.notes) &&
+    (candidate.curriculumCleared === undefined || typeof candidate.curriculumCleared === 'boolean') &&
+    (candidate.archivedCurricula === undefined ||
+      (Array.isArray(candidate.archivedCurricula) && candidate.archivedCurricula.every(isArchivedCurriculum))) &&
     (candidate.curriculum === undefined || candidate.curriculum === null || typeof candidate.curriculum === 'object');
 }
 
@@ -93,7 +150,12 @@ async function readData(file: string): Promise<StoredUserData> {
   try {
     const value: unknown = JSON.parse(await readFile(file, 'utf8'));
     if (!isStoredData(value)) throw new UserDataStoreError('storage_invalid');
-    return { ...value, curriculum: value.curriculum ?? null };
+    return {
+      ...value,
+      curriculum: value.curriculum ?? null,
+      curriculumCleared: value.curriculumCleared ?? false,
+      archivedCurricula: value.archivedCurricula ?? [],
+    };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return emptyData();
     if (error instanceof UserDataStoreError) throw error;
@@ -165,6 +227,14 @@ export function createScioUserDataStore({ dataDirectory }: { dataDirectory: stri
       return (await readData(fileFor(userId))).curriculum;
     },
 
+    async readCurriculumState(userId: string): Promise<
+      { status: 'default' } | { status: 'empty' } | { status: 'custom'; curriculum: unknown }
+    > {
+      const data = await readData(fileFor(userId));
+      if (data.curriculum) return { status: 'custom', curriculum: data.curriculum };
+      return data.curriculumCleared ? { status: 'empty' } : { status: 'default' };
+    },
+
     async saveCurriculum(userId: string, curriculum: unknown): Promise<void> {
       const file = fileFor(userId);
       if (!curriculum || typeof curriculum !== 'object' || Array.isArray(curriculum)) {
@@ -174,11 +244,63 @@ export function createScioUserDataStore({ dataDirectory }: { dataDirectory: stri
         await assertWritableUser(userId);
         const data = await readData(file);
         const { lessonIds, exerciseIds, cardIds } = curriculumObjectIds(curriculum);
+        const courseId = courseIdFor(curriculum);
+        const fingerprint = curriculumFingerprint(curriculum);
+        const archivedIndex = courseId
+          ? (data.archivedCurricula ?? []).findIndex((archive) =>
+              archive.courseId === courseId && archive.fingerprint === fingerprint)
+          : -1;
+        if (archivedIndex >= 0) {
+          const [archive] = (data.archivedCurricula ?? []).splice(archivedIndex, 1);
+          data.progress = archive.progress;
+          data.processedEventIds = archive.processedEventIds;
+          data.notes = archive.notes;
+        }
         data.curriculum = curriculum;
+        data.curriculumCleared = false;
         data.progress.completedLessonIds = data.progress.completedLessonIds.filter((id) => lessonIds.has(id));
         data.progress.passedExerciseIds = data.progress.passedExerciseIds.filter((id) => exerciseIds.has(id));
         data.progress.recalledCardIds = data.progress.recalledCardIds.filter((id) => cardIds.has(id));
         data.notes = data.notes.filter((note) => lessonIds.has(note.lessonId));
+        await writeData(file, data);
+      });
+    },
+
+    async clearCurriculum(userId: string, fallbackCurriculum?: unknown): Promise<void> {
+      const file = fileFor(userId);
+      await enqueue(file, async () => {
+        await assertWritableUser(userId);
+        const data = await readData(file);
+        if (data.curriculumCleared) return;
+        const curriculum = data.curriculum ?? fallbackCurriculum ?? null;
+        const courseId = courseIdFor(curriculum);
+        if (curriculum && !courseId) throw new UserDataStoreError('mutation_invalid');
+        if (curriculum && courseId) {
+          const fingerprint = curriculumFingerprint(curriculum);
+          const archives = data.archivedCurricula ?? [];
+          const existingIndex = archives.findIndex((archive) =>
+            archive.courseId === courseId && archive.fingerprint === fingerprint);
+          const archive: ArchivedCurriculum = {
+            courseId,
+            fingerprint,
+            curriculum,
+            progress: data.progress,
+            processedEventIds: data.processedEventIds,
+            notes: data.notes,
+          };
+          if (existingIndex >= 0) archives[existingIndex] = archive;
+          else {
+            if (archives.length >= 50) throw new UserDataStoreError('mutation_invalid');
+            archives.push(archive);
+          }
+          data.archivedCurricula = archives;
+        }
+        const empty = emptyData();
+        data.curriculum = null;
+        data.curriculumCleared = true;
+        data.progress = empty.progress;
+        data.processedEventIds = [];
+        data.notes = [];
         await writeData(file, data);
       });
     },
@@ -193,6 +315,7 @@ export function createScioUserDataStore({ dataDirectory }: { dataDirectory: stri
       await enqueue(file, async () => {
         await assertWritableUser(userId);
         const data = await readData(file);
+        if (data.curriculumCleared) throw new UserDataStoreError('mutation_invalid');
         if (data.processedEventIds.includes(mutation.eventId)) return;
         if (mutation.status === 'completed' && mutation.lessonId) {
           if (data.curriculum && !curriculumObjectIds(data.curriculum).lessonIds.has(mutation.lessonId)) {
@@ -220,6 +343,7 @@ export function createScioUserDataStore({ dataDirectory }: { dataDirectory: stri
       await enqueue(file, async () => {
         await assertWritableUser(userId);
         const data = await readData(file);
+        if (data.curriculumCleared) throw new UserDataStoreError('mutation_invalid');
         if (data.processedEventIds.includes(mutation.eventId)) return;
         if (data.curriculum && !curriculumObjectIds(data.curriculum).cardIds.has(mutation.cardId)) {
           throw new UserDataStoreError('mutation_invalid');
@@ -245,6 +369,7 @@ export function createScioUserDataStore({ dataDirectory }: { dataDirectory: stri
       await enqueue(file, async () => {
         await assertWritableUser(userId);
         const data = await readData(file);
+        if (data.curriculumCleared) throw new UserDataStoreError('mutation_invalid');
         if (data.curriculum && !curriculumObjectIds(data.curriculum).lessonIds.has(note.lessonId)) {
           throw new UserDataStoreError('mutation_invalid');
         }

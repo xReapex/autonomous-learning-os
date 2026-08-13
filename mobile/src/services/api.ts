@@ -96,13 +96,18 @@ async function request<T>(baseUrl: string, path: string, init?: RequestInit): Pr
   }
 }
 
-export async function getCurriculum(baseUrl: string): Promise<Curriculum> {
+export async function getCurriculum(baseUrl: string): Promise<Curriculum | null> {
   try {
-    return parseCurriculumDto(await request<unknown>(baseUrl, 'mobile/data/curriculum'));
+    const payload = await request<unknown>(baseUrl, 'mobile/data/curriculum');
+    return payload === undefined ? null : parseCurriculumDto(payload);
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError('unexpected', 'DTO_CURRICULUM_INVALID');
   }
+}
+
+export function deleteCurriculum(baseUrl: string): Promise<void> {
+  return request(baseUrl, 'mobile/data/curriculum', { method: 'DELETE' });
 }
 
 export function replaceCurriculum(baseUrl: string, data: ScioData): Promise<void> {

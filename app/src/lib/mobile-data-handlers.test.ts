@@ -132,4 +132,46 @@ describe('handlers de données mobile SCIO', () => {
     const progress = await (await handlers.getProgress(request('progress', token))).json();
     expect(progress.completedLessonIds).toEqual([]);
   });
+
+  it('retire uniquement le sujet actif, conserve son historique et sert ensuite un état vide', async () => {
+    const tokenA = 'token-a'.repeat(6);
+    const tokenB = 'token-b'.repeat(6);
+    const custom = structuredClone(defaultData);
+    custom.curriculum.course.id = 'cuisine';
+    expect((await handlers.putCurriculum(request('curriculum', tokenA, {
+      method: 'PUT',
+      body: JSON.stringify(custom),
+    }))).status).toBe(204);
+    expect((await handlers.patchProgress(request('progress', tokenA, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        eventId: 'lesson:cuisine:completed',
+        lessonId: custom.curriculum.course.modules[0].lessons[0].id,
+        status: 'completed',
+      }),
+    }))).status).toBe(204);
+
+    const removed = await handlers.deleteCurriculum(request('curriculum', tokenA, { method: 'DELETE' }));
+
+    expect(removed.status).toBe(204);
+    expect((await handlers.getCurriculum(request('curriculum', tokenA))).status).toBe(204);
+    expect(await (await handlers.getCards(request('cards', tokenA))).json()).toEqual({ cards: [], exercises: [] });
+    expect(await (await handlers.getProgress(request('progress', tokenA))).json()).toEqual({
+      completedLessonIds: [],
+      passedExerciseIds: [],
+      recalledCardIds: [],
+      weeklyLessons: 0,
+      weeklyReviews: 0,
+    });
+    expect((await handlers.getCurriculum(request('curriculum', tokenB))).status).toBe(200);
+
+    expect((await handlers.putCurriculum(request('curriculum', tokenA, {
+      method: 'PUT',
+      body: JSON.stringify(custom),
+    }))).status).toBe(204);
+    expect(await (await handlers.getProgress(request('progress', tokenA))).json()).toMatchObject({
+      completedLessonIds: [custom.curriculum.course.modules[0].lessons[0].id],
+      weeklyLessons: 1,
+    });
+  });
 });

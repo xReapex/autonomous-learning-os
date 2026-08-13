@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +15,9 @@ beforeEach(async () => {
   dataDirectory = await mkdtemp(join(tmpdir(), 'scio-account-route-'));
   vi.stubEnv('SCIO_AUTH_DATA_DIR', dataDirectory);
   vi.stubEnv('SCIO_USER_DATA_DIR', join(dataDirectory, 'user-data'));
-  vi.stubEnv('SCIO_GENERATION_JOBS_DIR', join(dataDirectory, 'generation-jobs'));
+  const generationJobsDirectory = join(dataDirectory, 'generation-jobs');
+  await mkdir(generationJobsDirectory, { recursive: true });
+  vi.stubEnv('SCIO_GENERATION_JOBS_DIR', generationJobsDirectory);
   vi.stubEnv('NODE_ENV', 'test');
   vi.stubEnv('SCIO_DEPLOYMENT_ENV', 'preview');
   vi.stubEnv('SCIO_AUTH_MODE', 'development');

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -43,6 +43,224 @@ describe('stockage pédagogique SCIO par utilisateur', () => {
 
     expect(await data.readCurriculum(userA)).toEqual(curriculum);
     expect(await data.readCurriculum(userB)).toBeNull();
+  });
+
+  it('relit les fichiers utilisateur antérieurs aux archives sans migration destructive', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'scio-user-data-legacy-'));
+    const userDirectory = join(directory, 'users', userA);
+    await mkdir(userDirectory, { recursive: true });
+    await writeFile(join(userDirectory, 'data.json'), JSON.stringify({
+      version: 1,
+      progress: {
+        completedLessonIds: ['lesson-one'],
+        passedExerciseIds: [],
+        recalledCardIds: [],
+        weeklyLessons: 1,
+        weeklyReviews: 0,
+      },
+      processedEventIds: ['lesson:one:completed'],
+      notes: [],
+      curriculum: null,
+    }));
+    const data = createScioUserDataStore({ dataDirectory: directory });
+
+    expect(await data.readCurriculumState(userA)).toEqual({ status: 'default' });
+    expect(await data.readProgress(userA)).toMatchObject({
+      completedLessonIds: ['lesson-one'],
+      weeklyLessons: 1,
+    });
+  });
+
+  it('retire le curriculum actif sans détruire ses données et les restaure au réajout', async () => {
+    const data = await store();
+    const curriculum = {
+      curriculum: { course: { id: 'cuisine', modules: [{ lessons: [{ id: 'lesson-one' }] }] } },
+      exercises: [{ id: 'exercise-one' }],
+      cards: [{ id: 'card-one' }],
+    };
+    await data.saveCurriculum(userA, curriculum);
+    await data.applyProgress(userA, {
+      eventId: 'lesson:one:completed',
+      lessonId: 'lesson-one',
+      status: 'completed',
+    });
+    await data.applyCard(userA, {
+      eventId: 'card:one:recalled',
+      cardId: 'card-one',
+      result: 'recalled',
+    });
+    await data.saveNote(userA, { lessonId: 'lesson-one', body: 'À retirer.' });
+
+    await data.clearCurriculum(userA, curriculum);
+
+    expect(await data.readCurriculumState(userA)).toEqual({ status: 'empty' });
+    expect(await data.readProgress(userA)).toEqual({
+      completedLessonIds: [],
+      passedExerciseIds: [],
+      recalledCardIds: [],
+      weeklyLessons: 0,
+      weeklyReviews: 0,
+    });
+    expect(await data.readNotes(userA)).toEqual([]);
+    await expect(data.applyProgress(userA, {
+      eventId: 'lesson:after-clear',
+      lessonId: 'lesson-one',
+      status: 'completed',
+    })).rejects.toMatchObject({ code: 'mutation_invalid' });
+
+    await data.saveCurriculum(userA, curriculum);
+
+    expect(await data.readProgress(userA)).toEqual({
+      completedLessonIds: ['lesson-one'],
+      passedExerciseIds: [],
+      recalledCardIds: ['card-one'],
+      weeklyLessons: 1,
+      weeklyReviews: 1,
+    });
+    expect(await data.readNotes(userA)).toEqual([
+      { lessonId: 'lesson-one', body: 'À retirer.' },
+    ]);
+  });
+
+  it('restaure un curriculum identique malgré un ordre de clés JSON différent', async () => {
+    const data = await store();
+    const first = {
+      curriculum: { course: { id: 'cuisine', modules: [{ lessons: [{ id: 'lesson-one' }] }] } },
+      exercises: [],
+      cards: [],
+    };
+    await data.saveCurriculum(userA, first);
+    await data.applyProgress(userA, {
+      eventId: 'lesson:one:completed',
+      lessonId: 'lesson-one',
+      status: 'completed',
+    });
+    await data.clearCurriculum(userA, first);
+    const reordered = {
+      cards: [],
+      exercises: [],
+      curriculum: { course: { modules: [{ lessons: [{ id: 'lesson-one' }] }], id: 'cuisine' } },
+    };
+
+    await data.saveCurriculum(userA, reordered);
+
+    expect(await data.readProgress(userA)).toMatchObject({
+      completedLessonIds: ['lesson-one'],
+      weeklyLessons: 1,
+    });
+  });
+
+  it('ne confond pas deux versions sous le même ID et conserve l’archive d’origine', async () => {
+    const data = await store();
+    const original = {
+      curriculum: { course: { id: 'cuisine', modules: [{ lessons: [{ id: 'lesson-old' }] }] } },
+      exercises: [],
+      cards: [{ id: 'card-old' }],
+    };
+    await data.saveCurriculum(userA, original);
+    await data.applyProgress(userA, {
+      eventId: 'lesson:old:completed',
+      lessonId: 'lesson-old',
+      status: 'completed',
+    });
+    await data.saveNote(userA, { lessonId: 'lesson-old', body: 'Ancienne note.' });
+    await data.clearCurriculum(userA, original);
+
+    const changed = {
+      curriculum: { course: { id: 'cuisine', modules: [{ lessons: [{ id: 'lesson-new' }] }] } },
+      exercises: [],
+      cards: [{ id: 'card-new' }],
+    };
+    await data.saveCurriculum(userA, changed);
+
+    expect(await data.readProgress(userA)).toMatchObject({ completedLessonIds: [] });
+    expect(await data.readNotes(userA)).toEqual([]);
+    await data.clearCurriculum(userA, changed);
+    await data.saveCurriculum(userA, original);
+    expect(await data.readProgress(userA)).toMatchObject({
+      completedLessonIds: ['lesson-old'],
+      weeklyLessons: 1,
+    });
+    expect(await data.readNotes(userA)).toEqual([
+      { lessonId: 'lesson-old', body: 'Ancienne note.' },
+    ]);
+  });
+
+  it('refuse de retirer un curriculum non archivable plutôt que détruire ses données', async () => {
+    const data = await store();
+    const invalidIdentity = {
+      curriculum: { course: { modules: [{ lessons: [{ id: 'lesson-one' }] }] } },
+      exercises: [],
+      cards: [],
+    };
+    await data.saveCurriculum(userA, invalidIdentity);
+    await data.applyProgress(userA, {
+      eventId: 'lesson:one:completed',
+      lessonId: 'lesson-one',
+      status: 'completed',
+    });
+
+    await expect(data.clearCurriculum(userA, invalidIdentity)).rejects.toMatchObject({
+      code: 'mutation_invalid',
+    });
+    expect(await data.readCurriculum(userA)).toEqual(invalidIdentity);
+    expect(await data.readProgress(userA)).toMatchObject({ completedLessonIds: ['lesson-one'] });
+  });
+
+  it('refuse une archive au-delà de la limite sans perdre le curriculum actif', async () => {
+    const data = await store();
+    for (let index = 0; index < 50; index += 1) {
+      const curriculum = {
+        curriculum: { course: { id: `course-${index}`, modules: [] } },
+        exercises: [],
+        cards: [],
+      };
+      await data.saveCurriculum(userA, curriculum);
+      await data.clearCurriculum(userA, curriculum);
+    }
+    const active = {
+      curriculum: { course: { id: 'course-over-limit', modules: [{ lessons: [{ id: 'lesson-active' }] }] } },
+      exercises: [],
+      cards: [],
+    };
+    await data.saveCurriculum(userA, active);
+    await data.applyProgress(userA, {
+      eventId: 'lesson:active:completed',
+      lessonId: 'lesson-active',
+      status: 'completed',
+    });
+
+    await expect(data.clearCurriculum(userA, active)).rejects.toMatchObject({
+      code: 'mutation_invalid',
+    });
+    expect(await data.readCurriculum(userA)).toEqual(active);
+    expect(await data.readProgress(userA)).toMatchObject({ completedLessonIds: ['lesson-active'] });
+  });
+
+  it('préserve l’archive lors de deux retraits concurrents du même curriculum', async () => {
+    const data = await store();
+    const curriculum = {
+      curriculum: { course: { id: 'cuisine', modules: [{ lessons: [{ id: 'lesson-one' }] }] } },
+      exercises: [],
+      cards: [],
+    };
+    await data.saveCurriculum(userA, curriculum);
+    await data.applyProgress(userA, {
+      eventId: 'lesson:one:completed',
+      lessonId: 'lesson-one',
+      status: 'completed',
+    });
+
+    await Promise.all([
+      data.clearCurriculum(userA, curriculum),
+      data.clearCurriculum(userA, curriculum),
+    ]);
+    await data.saveCurriculum(userA, curriculum);
+
+    expect(await data.readProgress(userA)).toMatchObject({
+      completedLessonIds: ['lesson-one'],
+      weeklyLessons: 1,
+    });
   });
 
   it('rend les événements idempotents pour un même utilisateur', async () => {

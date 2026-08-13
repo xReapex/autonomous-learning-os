@@ -44,3 +44,22 @@ test('les changements de réponse et de mutation sont annoncés', async () => {
   assert.match(reviews, /accessibilityLiveRegion="polite"/);
   assert.match(courses, /accessibilityLiveRegion="polite"/);
 });
+
+test('la suppression du sujet est confirmée et mène vers un état vide recréable', async () => {
+  const [courses, profile, ui] = await Promise.all([
+    source('app/(tabs)/courses.tsx'),
+    source('app/(tabs)/profile.tsx'),
+    source('components/ui.tsx'),
+  ]);
+  assert.match(courses, /requestDestructiveConfirmation\(\{/);
+  assert.match(courses, /confirmLabel:\s*t\('curriculum\.remove'\)/);
+  assert.match(courses, /variant="danger"/);
+  assert.match(courses, /removeActiveCurriculum\(\)/);
+  assert.match(ui, /status === 'empty'/);
+  assert.match(ui, /router\.push\('\/create-course'/);
+  assert.doesNotMatch(profile, /<DataGate>/);
+  const provider = await source('providers/data-provider.tsx');
+  assert.match(provider, /removeRemote:\s*\(\)\s*=>\s*deleteCurriculumRequest/);
+  assert.match(provider, /removeCache:\s*async\s*\(\)\s*=>/);
+  assert.match(provider, /commitLatest/);
+});
