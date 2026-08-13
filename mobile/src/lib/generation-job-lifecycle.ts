@@ -13,6 +13,7 @@ export async function finalizeGenerationJob(
   const terminal = job.status === 'queued' || job.status === 'running'
     ? await dependencies.cancel(job.id)
     : job;
+  if (terminal.id !== job.id) throw new Error('generation_job_identity_mismatch');
   if (terminal.status === 'queued' || terminal.status === 'running') {
     throw new Error('generation_job_not_terminal');
   }

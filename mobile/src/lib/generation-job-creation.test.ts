@@ -9,6 +9,7 @@ function dependencies(): GenerationCreationDependencies {
   return {
     persistCreating: vi.fn(async () => undefined),
     create: vi.fn(async () => job),
+    onCreated: vi.fn(),
     persistAttached: vi.fn(async () => undefined),
   };
 }
@@ -42,6 +43,23 @@ describe('création durable journalisée', () => {
       locale: 'fr',
     }, deps)).rejects.toThrow('storage');
     expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it('publie l’identité créée avant de persister le pointeur attaché', async () => {
+    const deps = dependencies();
+    const calls: string[] = [];
+    vi.mocked(deps.onCreated!).mockImplementation(() => { calls.push('created'); });
+    vi.mocked(deps.persistAttached).mockImplementation(async () => {
+      calls.push('persist-attached');
+      throw new Error('storage');
+    });
+    await expect(startDurableGeneration({
+      stateToken: 's'.repeat(40),
+      requestId: 'generation-1723456789000-1',
+      locale: 'fr',
+    }, deps)).rejects.toThrow('storage');
+    expect(calls).toEqual(['created', 'persist-attached']);
+    expect(deps.onCreated).toHaveBeenCalledWith(job);
   });
 
   it('conserve le state signé uniquement comme argument du POST, jamais dans le journal', async () => {

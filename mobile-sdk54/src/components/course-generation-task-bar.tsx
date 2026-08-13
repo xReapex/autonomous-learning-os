@@ -1,10 +1,12 @@
 import { useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon } from '@/components/app-icon';
+import { GenerationProgressCard } from '@/components/generation-progress-card';
 import { palette, radius, spacing, typography } from '@/constants/theme';
+import { resolveDurableGenerationProgress } from '@/lib/generation-progress';
 import { haptics } from '@/lib/haptics';
 import { useFluidLayout } from '@/lib/use-fluid-layout';
 import { useCourseGeneration } from '@/providers/course-generation-provider';
@@ -36,19 +38,15 @@ export function CourseGenerationTaskBar() {
   const ready = state.status === 'ready';
   const expired = state.status === 'error' && state.error === 'expired';
   const title = t(
-    running
-      ? 'generation.running.title'
-      : ready
-        ? 'generation.ready.title'
+    ready
+      ? 'generation.ready.title'
         : expired
           ? 'generation.expired.title'
           : 'generation.error.title',
   );
   const body = t(
-    running
-      ? 'generation.running.body'
-      : ready
-        ? 'generation.ready.body'
+    ready
+      ? 'generation.ready.body'
         : expired
           ? 'generation.expired.body'
           : 'generation.error.body',
@@ -69,6 +67,8 @@ export function CourseGenerationTaskBar() {
     retry();
   };
 
+  const progress = running ? resolveDurableGenerationProgress(state.phase) : null;
+
   return (
     <View
       onLayout={({ nativeEvent }) => setOverlayInset(nativeEvent.layout.height + spacing.md)}
@@ -81,12 +81,39 @@ export function CourseGenerationTaskBar() {
           bottom: insets.bottom + (inTabs ? fluid.tabBarHeight : 0) + fluid.gutter * 0.6,
         },
       ]}>
+      {progress ? (
+        <GenerationProgressCard
+          body={t(progress.bodyKey)}
+          icon={progress.icon}
+          progress={progress.progress}
+          status={t(progress.statusKey)}
+          step={progress.step}
+          title={t(progress.titleKey)}
+          totalSteps={progress.totalSteps}
+          style={styles.progressCard}
+        />
+      ) : ready ? (
+        <Pressable
+          accessibilityLabel={`${title}. ${body}`}
+          accessibilityRole="button"
+          onPress={activate}
+          style={({ pressed }) => [styles.readyAction, pressed && styles.pressed]}>
+          <GenerationProgressCard
+            body={body}
+            icon="book-complete"
+            progress={100}
+            status={t('generation.ready.status')}
+            step={5}
+            title={title}
+            totalSteps={5}
+            tone="ready"
+          />
+        </Pressable>
+      ) : (
       <Pressable
         accessibilityLabel={`${title}. ${body}`}
         accessibilityLiveRegion="polite"
-        accessibilityRole={running ? 'progressbar' : 'button'}
-        accessibilityState={{ busy: running }}
-        disabled={running}
+        accessibilityRole="button"
         onPress={activate}
         style={({ pressed }) => [
           styles.task,
@@ -102,22 +129,20 @@ export function CourseGenerationTaskBar() {
             ready && styles.iconReady,
             state.status === 'error' && styles.iconError,
           ]}>
-          {running ? (
-            <ActivityIndicator color={palette.primary} size="small" />
-          ) : (
-            <AppIcon
-              color={ready ? palette.onPrimary : palette.danger}
-              name={ready ? 'check' : 'refresh'}
-              size={19}
-            />
-          )}
+          <AppIcon
+            color={ready ? palette.onPrimary : palette.danger}
+            name={ready ? 'book-complete' : 'refresh'}
+            size={20}
+            strokeWidth={1.9}
+          />
         </View>
         <View style={styles.copy}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.body}>{body}</Text>
         </View>
-        {!running ? <AppIcon color={palette.muted} name="chevron-right" size={20} /> : null}
+        <AppIcon color={ready ? palette.primaryText : palette.muted} name="chevron-right" size={20} />
       </Pressable>
+      )}
     </View>
   );
 }
@@ -145,6 +170,14 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   taskError: { borderColor: palette.danger },
+  progressCard: {
+    shadowColor: palette.ink,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 9,
+  },
+  readyAction: { width: '100%' },
   taskLargeText: { flexDirection: 'column', alignItems: 'stretch', paddingVertical: spacing.md },
   icon: {
     borderRadius: radius.md,

@@ -16,7 +16,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppIcon } from '@/components/app-icon';
-import { Button, ProgressBar, Reveal, Surface, textStyles } from '@/components/ui';
+import { GenerationProgressCard } from '@/components/generation-progress-card';
+import { Button, Reveal, Surface, textStyles } from '@/components/ui';
 import { layout, palette, radius, spacing, typography } from '@/constants/theme';
 import {
   beginEngineInterview,
@@ -27,6 +28,7 @@ import {
 import { haptics } from '@/lib/haptics';
 import type { TranslationKey } from '@/lib/i18n';
 import { createMutationLock } from '@/lib/mutation-lock';
+import { advanceInterviewProgress, resolveInterviewProgress } from '@/lib/generation-progress';
 import { useFluidLayout } from '@/lib/use-fluid-layout';
 import { useAuth } from '@/providers/auth-provider';
 import { useCourseGeneration } from '@/providers/course-generation-provider';
@@ -66,7 +68,7 @@ export default function CreateCourseScreen() {
 
   const acceptResponse = (response: EngineInterviewResponse, userAnswer?: string) => {
     setStateToken(response.state);
-    setProgress(response.progress);
+    setProgress((current) => advanceInterviewProgress(current, response.progress));
     if (userAnswer) setTurns((current) => [...current, { role: 'user', content: userAnswer }]);
     if (response.phase === 'question') {
       setQuestionChoices(response.choices);
@@ -143,6 +145,13 @@ export default function CreateCourseScreen() {
 
   const proposal = generation.status === 'ready' ? generation.proposal : null;
   const visibleStage = proposal && stage !== 'activated' ? 'preview' : stage;
+  const interviewProgress = visibleStage === 'question'
+    ? resolveInterviewProgress('question', progress, busy)
+    : visibleStage === 'confirmation'
+      ? resolveInterviewProgress('confirmation', progress, busy)
+      : visibleStage === 'subject' && busy
+        ? resolveInterviewProgress('starting', 0, true)
+        : null;
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -227,14 +236,15 @@ export default function CreateCourseScreen() {
             </View>
           ) : null}
 
-          {visibleStage === 'question' || visibleStage === 'confirmation' ? (
-            <View style={styles.progressBlock}>
-              <View style={styles.progressMeta}>
-                <Text style={styles.progressLabel}>{t('engine.personalization')}</Text>
-                <Text style={styles.progressValue}>{progress}%</Text>
-              </View>
-              <ProgressBar value={progress} accessibilityLabel={t('a11y.progress', { value: progress })} />
-            </View>
+          {interviewProgress ? (
+            <GenerationProgressCard
+              icon={interviewProgress.icon}
+              progress={interviewProgress.progress}
+              status={t(interviewProgress.statusKey)}
+              step={interviewProgress.step}
+              title={t(interviewProgress.titleKey)}
+              totalSteps={interviewProgress.totalSteps}
+            />
           ) : null}
 
           {errorCode ? (
@@ -426,10 +436,6 @@ const styles = StyleSheet.create({
   eyebrow: { color: palette.primaryText, fontFamily: typography.bold, fontSize: 11, letterSpacing: 1.6 },
   title: { color: palette.ink, fontFamily: typography.display, letterSpacing: -0.6 },
   subtitle: { color: palette.muted, fontFamily: typography.body, fontSize: 16, lineHeight: 24 },
-  progressBlock: { gap: spacing.sm },
-  progressMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  progressLabel: { color: palette.primaryText, fontFamily: typography.bold, fontSize: 10, letterSpacing: 1.4 },
-  progressValue: { color: palette.muted, fontFamily: typography.mono, fontSize: 11 },
   card: { gap: spacing.md },
   cardTitle: { color: palette.ink, fontFamily: typography.title, fontSize: 21, lineHeight: 27 },
   input: { minHeight: layout.touchTarget, borderWidth: 1, borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.surfaceRaised, color: palette.ink, fontFamily: typography.body, fontSize: 16, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },

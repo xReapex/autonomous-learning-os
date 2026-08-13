@@ -46,4 +46,13 @@ describe('fin de vie d’un job durable', () => {
     await expect(finalizeGenerationJob(terminal, acknowledgeFailure)).rejects.toThrow('network');
     expect(acknowledgeFailure.removeLocal).not.toHaveBeenCalled();
   });
+
+  it('refuse une réponse d’annulation portant une autre identité', async () => {
+    const deps = dependencies();
+    const wrong = { ...active, id: `job_${'b'.repeat(32)}`, status: 'cancelled' } as GenerationJob;
+    vi.mocked(deps.cancel).mockResolvedValue(wrong);
+    await expect(finalizeGenerationJob(active, deps)).rejects.toThrow('generation_job_identity_mismatch');
+    expect(deps.acknowledge).not.toHaveBeenCalled();
+    expect(deps.removeLocal).not.toHaveBeenCalled();
+  });
 });

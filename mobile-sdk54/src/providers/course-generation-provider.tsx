@@ -13,6 +13,7 @@ import {
 import {
   courseGenerationReducer,
   idleCourseGeneration,
+  type CourseGenerationError,
   type CourseGenerationState,
 } from '@/lib/course-generation-state';
 import { startDurableGeneration } from '@/lib/generation-job-creation';
@@ -32,7 +33,7 @@ import {
   serializeCreatingGenerationJob,
   type GenerationJobPointer,
 } from '@/lib/generation-job-pointer';
-import { pollGenerationJob } from '@/lib/generation-job-poller';
+import { GenerationJobPollError, pollGenerationJob } from '@/lib/generation-job-poller';
 import { EngineApiError } from '@/lib/engine-api';
 import { convertGeneratedCurriculum } from '@/lib/generated-curriculum';
 import type { Locale } from '@/lib/i18n';
@@ -58,6 +59,9 @@ const lifecycleDependencies = {
   removeLocal: removeLocalJournal,
 };
 
+const generationErrorCode = (error: unknown): CourseGenerationError =>
+  error instanceof EngineApiError || error instanceof GenerationJobPollError ? error.code : 'network';
+
 export function CourseGenerationProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(courseGenerationReducer, idleCourseGeneration);
   const activeRequest = useRef<string | null>(null);
@@ -67,20 +71,29 @@ export function CourseGenerationProvider({ children }: { children: ReactNode }) 
   const cleanupRequests = useRef(new Set<string>());
   const mounted = useRef(true);
 
+  const observeJob = useCallback((requestId: string, job: GenerationJob) => {
+    if (!mounted.current || activeRequest.current !== requestId) return;
+    dispatch({ type: 'attach', requestId, jobId: job.id });
+    if (job.status !== 'queued' && job.status !== 'running') return;
+    dispatch({ type: 'observe', requestId, jobId: job.id, jobStatus: job.status });
+  }, []);
+
   const completeJob = useCallback(async (pointer: GenerationJobPointer, job: GenerationJob) => {
     if (!mounted.current || activeRequest.current !== pointer.requestId) return;
+    if (job.id !== pointer.jobId) throw new GenerationJobPollError('Job identity mismatch');
     if (job.status === 'succeeded') {
       if (job.output?.phase !== 'proposal') throw new EngineApiError('invalid');
       dispatch({
         type: 'succeed',
         requestId: pointer.requestId,
+        jobId: pointer.jobId,
         proposal: convertGeneratedCurriculum(job.output.document, pointer.locale),
       });
       return;
     }
     await finalizeGenerationJob(job, lifecycleDependencies);
     if (!mounted.current || activeRequest.current !== pointer.requestId) return;
-    dispatch({ type: 'fail', requestId: pointer.requestId, error: 'expired' });
+    dispatch({ type: 'fail', requestId: pointer.requestId, jobId: pointer.jobId, error: 'expired' });
   }, []);
 
   const follow = useCallback(async (pointer: GenerationJobPointer) => {
@@ -90,6 +103,7 @@ export function CourseGenerationProvider({ children }: { children: ReactNode }) 
       const job = await pollGenerationJob(pointer.jobId, {
         get: getGenerationJob,
         isCancelled: () => !mounted.current || activeRequest.current !== pointer.requestId,
+        onUpdate: (current) => observeJob(pointer.requestId, current),
       });
       if (job) await completeJob(pointer, job);
     } catch (error) {
@@ -97,40 +111,44 @@ export function CourseGenerationProvider({ children }: { children: ReactNode }) 
       dispatch({
         type: 'fail',
         requestId: pointer.requestId,
-        error: error instanceof EngineApiError ? error.code : 'network',
+        jobId: pointer.jobId,
+        error: generationErrorCode(error),
       });
     } finally {
       if (activeRequest.current === pointer.requestId) activeRequest.current = null;
     }
-  }, [completeJob]);
+  }, [completeJob, observeJob]);
 
   const recoverCreating = useCallback(async (input: { requestId: string; locale: Locale }) => {
     if (activeRequest.current) return;
     activeRequest.current = input.requestId;
     pendingCreation.current = input;
+    let attachedJobId: string | null = null;
     dispatch({ type: 'start', input: { ...input, jobId: null } });
     try {
       const job = await resolveGenerationJob(input.requestId);
+      attachedJobId = job.id;
       const pointer = { jobId: job.id, ...input } satisfies GenerationJobPointer;
+      observeJob(input.requestId, job);
       await AsyncStorage.setItem(generationJobStorageKey, serializeAttachedGenerationJob(pointer));
       if (!mounted.current || activeRequest.current !== input.requestId) return;
-      dispatch({ type: 'attach', requestId: input.requestId, jobId: job.id });
       const terminal = job.status === 'queued' || job.status === 'running'
         ? await pollGenerationJob(job.id, {
             get: getGenerationJob,
             isCancelled: () => !mounted.current || activeRequest.current !== input.requestId,
+            onUpdate: (current) => observeJob(input.requestId, current),
           })
         : job;
       if (terminal) await completeJob(pointer, terminal);
     } catch (error) {
       if (!mounted.current || activeRequest.current !== input.requestId) return;
-      const code = error instanceof EngineApiError ? error.code : 'network';
+      const code = generationErrorCode(error);
       if (code === 'expired') await removeLocalJournal().catch(() => undefined);
-      dispatch({ type: 'fail', requestId: input.requestId, error: code });
+      dispatch({ type: 'fail', requestId: input.requestId, jobId: attachedJobId, error: code });
     } finally {
       if (activeRequest.current === input.requestId) activeRequest.current = null;
     }
-  }, [completeJob]);
+  }, [completeJob, observeJob]);
 
   useEffect(() => {
     mounted.current = true;
@@ -153,12 +171,17 @@ export function CourseGenerationProvider({ children }: { children: ReactNode }) 
   }, [follow, recoverCreating]);
 
   const executeCreation = useCallback((stateToken: string, input: { requestId: string; locale: Locale }) => {
+    let attachedJobId: string | null = null;
     void startDurableGeneration({ stateToken, ...input }, {
       persistCreating: (creating) => AsyncStorage.setItem(
         generationJobStorageKey,
         serializeCreatingGenerationJob(creating),
       ),
       create: createGenerationJob,
+      onCreated: (job) => {
+        attachedJobId = job.id;
+        observeJob(input.requestId, job);
+      },
       persistAttached: (pointer) => AsyncStorage.setItem(
         generationJobStorageKey,
         serializeAttachedGenerationJob(pointer),
@@ -172,11 +195,11 @@ export function CourseGenerationProvider({ children }: { children: ReactNode }) 
         return;
       }
       if (!mounted.current || activeRequest.current !== input.requestId) return;
-      dispatch({ type: 'attach', requestId: input.requestId, jobId: job.id });
       const terminal = job.status === 'queued' || job.status === 'running'
         ? await pollGenerationJob(job.id, {
             get: getGenerationJob,
             isCancelled: () => !mounted.current || activeRequest.current !== input.requestId,
+            onUpdate: (current) => observeJob(input.requestId, current),
           })
         : job;
       if (terminal) await completeJob(pointer, terminal);
@@ -185,12 +208,13 @@ export function CourseGenerationProvider({ children }: { children: ReactNode }) 
       dispatch({
         type: 'fail',
         requestId: input.requestId,
-        error: error instanceof EngineApiError ? error.code : 'network',
+        jobId: attachedJobId,
+        error: generationErrorCode(error),
       });
     }).finally(() => {
       if (activeRequest.current === input.requestId) activeRequest.current = null;
     });
-  }, [completeJob]);
+  }, [completeJob, observeJob]);
 
   const launch = useCallback((stateToken: string, locale: Locale) => {
     if (activeRequest.current) return false;
@@ -253,7 +277,7 @@ export function CourseGenerationProvider({ children }: { children: ReactNode }) 
         if (mounted.current) dispatch({ type: 'clear' });
       } catch {
         if (mounted.current && state.status === 'running') {
-          dispatch({ type: 'fail', requestId: input.requestId, error: 'network' });
+          dispatch({ type: 'fail', requestId: input.requestId, jobId, error: 'network' });
         }
       } finally {
         cleanupRequests.current.delete(input.requestId);

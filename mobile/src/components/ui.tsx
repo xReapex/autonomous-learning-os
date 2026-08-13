@@ -226,21 +226,31 @@ export function ProgressBar({
   accessibilityLabel,
   trackColor = palette.surfaceRaised,
   fillColor = palette.primary,
+  hiddenFromAccessibility = false,
+  indeterminate = false,
 }: {
   value: number;
   accessibilityLabel: string;
   trackColor?: string;
   fillColor?: string;
+  hiddenFromAccessibility?: boolean;
+  indeterminate?: boolean;
 }) {
   const normalized = Math.max(0, Math.min(100, value));
   return (
     <View
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityValue={{ min: 0, max: 100, now: normalized }}
+      accessible={!hiddenFromAccessibility}
+      accessibilityElementsHidden={hiddenFromAccessibility}
+      accessibilityRole={hiddenFromAccessibility ? undefined : 'progressbar'}
+      accessibilityLabel={hiddenFromAccessibility ? undefined : accessibilityLabel}
+      accessibilityValue={hiddenFromAccessibility ? undefined : { min: 0, max: 100, now: normalized }}
+      importantForAccessibility={hiddenFromAccessibility ? 'no-hide-descendants' : 'auto'}
       style={[styles.progressTrack, { backgroundColor: trackColor }]}>
-      <View style={[styles.progressFill, { backgroundColor: fillColor, width: `${normalized}%` }]} />
+      <View style={[
+        styles.progressFill,
+        indeterminate && styles.progressFillIndeterminate,
+        { backgroundColor: fillColor, width: indeterminate ? '34%' : `${normalized}%` },
+      ]} />
     </View>
   );
 }
@@ -475,6 +485,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: radius.pill },
+  progressFillIndeterminate: { alignSelf: 'center' },
   metric: { flex: 1, minWidth: 90, gap: 3 },
   metricIcon: {
     width: 30,

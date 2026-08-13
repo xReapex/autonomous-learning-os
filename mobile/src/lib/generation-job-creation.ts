@@ -5,6 +5,7 @@ import type { Locale } from './i18n';
 export type GenerationCreationDependencies = {
   persistCreating: (input: { requestId: string; locale: Locale }) => Promise<void>;
   create: (stateToken: string, requestId: string) => Promise<GenerationJob>;
+  onCreated?: (job: GenerationJob) => void;
   persistAttached: (pointer: GenerationJobPointer) => Promise<void>;
 };
 
@@ -14,6 +15,7 @@ export async function startDurableGeneration(
 ): Promise<GenerationJob> {
   await dependencies.persistCreating({ requestId: input.requestId, locale: input.locale });
   const job = await dependencies.create(input.stateToken, input.requestId);
+  dependencies.onCreated?.(job);
   await dependencies.persistAttached({
     jobId: job.id,
     requestId: input.requestId,
