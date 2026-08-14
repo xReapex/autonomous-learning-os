@@ -34,6 +34,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { useCourseGeneration } from '@/providers/course-generation-provider';
 import { useScioData } from '@/providers/data-provider';
 import { useLocale } from '@/providers/locale-provider';
+import { useOverlayInset } from '@/providers/overlay-inset-provider';
 
 type Stage = 'subject' | 'question' | 'confirmation' | 'preview' | 'activated';
 type Turn = { role: 'assistant' | 'user'; content: string };
@@ -59,6 +60,7 @@ export default function CreateCourseScreen() {
   const interviewLock = useRef(createMutationLock());
   const activationLock = useRef(createMutationLock());
   const fluid = useFluidLayout();
+  const { overlayInset } = useOverlayInset();
 
   const fail = (error: unknown) => {
     const code = error instanceof EngineApiError ? error.code : 'invalid';
@@ -215,7 +217,7 @@ export default function CreateCourseScreen() {
               width: fluid.contentWidth,
               paddingHorizontal: fluid.gutter,
               paddingTop: fluid.gutter,
-              paddingBottom: fluid.sectionGap,
+              paddingBottom: fluid.sectionGap + overlayInset,
               gap: fluid.sectionGap,
             },
           ]}
@@ -277,7 +279,7 @@ export default function CreateCourseScreen() {
             <View style={styles.wizard}>
               <View style={styles.topicLine}>
                 <Text style={styles.topicLabel}>{t('engine.subjectContext')}</Text>
-                <Text numberOfLines={1} style={styles.topicText}>{subject}</Text>
+                <Text style={styles.topicText}>{subject}</Text>
               </View>
               <Text style={styles.questionStep}>{t('engine.questionStep', { value: Math.max(1, answerCount) })}</Text>
               <Text
@@ -316,7 +318,11 @@ export default function CreateCourseScreen() {
                         <Text style={[styles.choiceMarkerText, selected && styles.choiceMarkerTextActive]}>{String.fromCharCode(65 + index)}</Text>
                       </View>
                       <Text style={styles.choiceText}>{choice}</Text>
-                      {selected && busy ? <ActivityIndicator color={palette.primary} size="small" /> : <AppIcon color={palette.faint} name="chevron-right" size={19} strokeWidth={1.8} />}
+                      <View style={[styles.choiceAccessory, { width: fluid.controlSize * 0.65 }]}>
+                        {selected && busy
+                          ? <ActivityIndicator color={palette.primary} size="small" />
+                          : <AppIcon color={palette.faint} name="chevron-right" size={19} strokeWidth={1.8} />}
+                      </View>
                     </Pressable>
                   );
                 })}
@@ -415,7 +421,7 @@ export default function CreateCourseScreen() {
               <View style={[styles.activatedIcon, { width: fluid.controlSize * 1.1, aspectRatio: 1 }]}>
                 <AppIcon color={palette.onPrimary} name="check" size={fluid.controlSize * 0.52} />
               </View>
-              <Text ref={stageHeading} accessibilityLiveRegion="polite" accessibilityRole="header" style={styles.cardTitle}>{t('engine.activated')}</Text>
+              <Text ref={stageHeading} accessibilityLiveRegion="polite" accessibilityRole="header" style={[styles.cardTitle, styles.center]}>{t('engine.activated')}</Text>
               <Button label={t('home.resume')} onPress={() => router.replace('/courses')} />
             </Surface>
           ) : null}
@@ -446,7 +452,7 @@ const styles = StyleSheet.create({
   wizard: { gap: spacing.lg },
   topicLine: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: palette.line },
   topicLabel: { color: palette.faint, fontFamily: typography.bold, fontSize: 10, letterSpacing: 1.3 },
-  topicText: { flex: 1, color: palette.ink, fontFamily: typography.strong, fontSize: 14 },
+  topicText: { flex: 1, color: palette.ink, fontFamily: typography.strong, fontSize: 14, lineHeight: 20 },
   questionStep: { marginTop: spacing.sm, color: palette.primaryText, fontFamily: typography.bold, fontSize: 10, letterSpacing: 1.5 },
   questionTitle: { color: palette.ink, fontFamily: typography.title, letterSpacing: -0.4 },
   choiceHint: { marginTop: -spacing.sm, color: palette.muted, fontFamily: typography.body, fontSize: 14, lineHeight: 20 },
@@ -458,6 +464,7 @@ const styles = StyleSheet.create({
   choiceMarkerActive: { backgroundColor: palette.primary },
   choiceMarkerText: { color: palette.muted, fontFamily: typography.mono, fontSize: 12 },
   choiceMarkerTextActive: { color: palette.onPrimary },
+  choiceAccessory: { alignItems: 'center', justifyContent: 'center' },
   choiceText: { flex: 1, color: palette.ink, fontFamily: typography.strong, fontSize: 15, lineHeight: 21 },
   otherAnswer: { minHeight: layout.touchTarget, alignSelf: 'flex-start', justifyContent: 'center', paddingRight: spacing.md },
   otherAnswerText: { color: palette.primaryText, fontFamily: typography.strong, fontSize: 14, textDecorationLine: 'underline' },

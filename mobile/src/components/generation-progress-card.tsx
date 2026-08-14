@@ -50,11 +50,16 @@ export function GenerationProgressCard({
         tone === 'ready' && styles.readyCard,
         style,
       ]}>
-      <View style={[styles.iconFrame, { minWidth: fluid.controlSize * 0.88, minHeight: fluid.controlSize * 0.88 }, tone === 'ready' && styles.readyIcon]}>
+      <View style={[
+        styles.iconFrame,
+        { minWidth: fluid.controlSize * 0.88, minHeight: fluid.controlSize * 0.88 },
+        largeText && styles.iconFrameLargeText,
+        tone === 'ready' && styles.readyIcon,
+      ]}>
         <AppIcon color={iconColor} name={icon} size={22} strokeWidth={1.9} />
       </View>
 
-      <View style={styles.content}>
+      <View style={[styles.content, largeText && styles.contentLargeText]}>
         <View style={[styles.topline, largeText && styles.toplineLargeText]}>
           <Text style={[styles.status, tone === 'ready' && styles.readyStatus]}>{status}</Text>
           <Text style={[styles.step, tone === 'ready' && styles.readyMeta]}>{stepLabel}</Text>
@@ -81,7 +86,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.md,
     borderWidth: 1,
     borderColor: palette.surfaceDeep,
@@ -92,15 +97,17 @@ const styles = StyleSheet.create({
     borderColor: palette.primaryDark,
     backgroundColor: palette.primaryDark,
   },
-  largeText: { flexDirection: 'column' },
+  largeText: { flexDirection: 'column', alignItems: 'stretch' },
   iconFrame: {
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,
     backgroundColor: palette.primarySoft,
   },
+  iconFrameLargeText: { alignSelf: 'center' },
   readyIcon: { backgroundColor: palette.primaryLight },
   content: { flex: 1, minWidth: 0, gap: spacing.xs },
+  contentLargeText: { flex: 0, width: '100%' },
   topline: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm },
   toplineLargeText: { flexDirection: 'column', alignItems: 'flex-start' },
   status: {

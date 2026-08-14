@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,11 +11,21 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  FadeInDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { elevation, layout, palette, radius, spacing, typography } from '@/constants/theme';
 import { haptics } from '@/lib/haptics';
+import { resolveIndeterminateOffset } from '@/lib/progress-animation';
 import { useFluidLayout } from '@/lib/use-fluid-layout';
 import { useLocale } from '@/providers/locale-provider';
 import { useScioData } from '@/providers/data-provider';
@@ -187,6 +197,11 @@ export function Button({ busy = false, label, icon, variant = 'primary', disable
         : variant === 'secondary'
           ? palette.primaryText
           : palette.ink;
+  const accessory = busy
+    ? <ActivityIndicator color={labelColor} size="small" />
+    : icon
+      ? <AppIcon name={icon} size={20} color={labelColor} />
+      : null;
 
   return (
     <Pressable
@@ -215,8 +230,19 @@ export function Button({ busy = false, label, icon, variant = 'primary', disable
         inactive && styles.disabled,
         typeof style === 'function' ? style(state) : style,
       ]}>
-      {busy ? <ActivityIndicator color={labelColor} size="small" /> : icon ? <AppIcon name={icon} size={20} color={labelColor} /> : null}
-      <Text style={[styles.buttonLabel, { color: labelColor }]}>{label}</Text>
+      {accessory ? (
+        <>
+          <View style={styles.buttonAccessory}>{accessory}</View>
+          <Text style={[styles.buttonLabel, { color: labelColor }]}>{label}</Text>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={styles.buttonAccessory}
+          />
+        </>
+      ) : (
+        <Text style={[styles.buttonLabel, { color: labelColor }]}>{label}</Text>
+      )}
     </Pressable>
   );
 }
@@ -237,6 +263,30 @@ export function ProgressBar({
   indeterminate?: boolean;
 }) {
   const normalized = Math.max(0, Math.min(100, value));
+  const reducedMotion = useReducedMotion();
+  const [trackWidth, setTrackWidth] = useState(0);
+  const travel = useSharedValue(0);
+
+  useEffect(() => {
+    cancelAnimation(travel);
+    travel.value = 0;
+    if (!indeterminate || reducedMotion || trackWidth <= 0) return;
+    travel.value = withRepeat(
+      withTiming(1, { duration: 1250, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true,
+    );
+    return () => cancelAnimation(travel);
+  }, [indeterminate, reducedMotion, trackWidth, travel]);
+
+  const indeterminateStyle = useAnimatedStyle(() => ({
+    transform: [{
+      translateX: indeterminate
+        ? resolveIndeterminateOffset(trackWidth, travel.value, reducedMotion)
+        : 0,
+    }],
+  }));
+
   return (
     <View
       accessible={!hiddenFromAccessibility}
@@ -245,10 +295,11 @@ export function ProgressBar({
       accessibilityLabel={hiddenFromAccessibility ? undefined : accessibilityLabel}
       accessibilityValue={hiddenFromAccessibility ? undefined : { min: 0, max: 100, now: normalized }}
       importantForAccessibility={hiddenFromAccessibility ? 'no-hide-descendants' : 'auto'}
+      onLayout={({ nativeEvent }) => setTrackWidth(nativeEvent.layout.width)}
       style={[styles.progressTrack, { backgroundColor: trackColor }]}>
-      <View style={[
+      <Animated.View style={[
         styles.progressFill,
-        indeterminate && styles.progressFillIndeterminate,
+        indeterminateStyle,
         { backgroundColor: fillColor, width: indeterminate ? '34%' : `${normalized}%` },
       ]} />
     </View>
@@ -469,6 +520,12 @@ const styles = StyleSheet.create({
   buttonGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: palette.line },
   buttonContrast: { backgroundColor: palette.white },
   buttonDanger: { backgroundColor: palette.danger, borderColor: palette.danger },
+  buttonAccessory: {
+    width: 20,
+    minHeight: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   buttonLabel: {
     flexShrink: 1,
     fontFamily: typography.strong,
@@ -485,7 +542,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: radius.pill },
-  progressFillIndeterminate: { alignSelf: 'center' },
+
   metric: { flex: 1, minWidth: 90, gap: 3 },
   metricIcon: {
     width: 30,
