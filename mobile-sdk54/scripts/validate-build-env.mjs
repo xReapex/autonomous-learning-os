@@ -9,6 +9,9 @@ export function validateBuildEnvironment(environment) {
   const rawEngineUrl = environment.EXPO_PUBLIC_ENGINE_URL?.trim();
 
   if (demo) throw new Error('demo_mode_removed');
+  if (profile !== 'preview' || deploymentEnvironment !== 'preview') {
+    throw new Error('sdk54_store_build_forbidden');
+  }
   if (developmentAuth && profile === 'production') throw new Error('production_dev_auth_forbidden');
   if (developmentAuth && deploymentEnvironment !== 'preview') throw new Error('dev_auth_deployment_forbidden');
   if (!rawUrl) throw new Error('api_url_required');
@@ -44,7 +47,10 @@ export function validateBuildEnvironment(environment) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const result = validateBuildEnvironment(process.env);
+    const environment = process.argv.includes('--local-preview')
+      ? { ...process.env, EAS_BUILD_PROFILE: 'preview' }
+      : process.env;
+    const result = validateBuildEnvironment(environment);
     console.log(`SCIO build environment valid (${result.mode})`);
   } catch (error) {
     console.error(`SCIO build environment invalid: ${error instanceof Error ? error.message : 'unknown'}`);

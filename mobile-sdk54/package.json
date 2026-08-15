@@ -47,7 +47,7 @@
     "typecheck": "tsc --noEmit",
     "validate:build-env": "node scripts/validate-build-env.mjs",
     "eas-build-pre-install": "node scripts/validate-build-env.mjs",
-    "export": "node scripts/validate-build-env.mjs && expo export --platform all --output-dir dist"
+    "export": "node scripts/validate-build-env.mjs --local-preview && expo export --platform all --output-dir dist"
   },
   "private": true
 }

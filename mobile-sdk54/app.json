@@ -18,14 +18,14 @@
       "resizeMode": "contain"
     },
     "ios": {
-      "bundleIdentifier": "io.scio.app",
+      "bundleIdentifier": "io.scio.preview",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "io.scio.app",
+      "package": "io.scio.preview",
       "permissions": [],
       "adaptiveIcon": {
         "backgroundColor": "#0B5D57",

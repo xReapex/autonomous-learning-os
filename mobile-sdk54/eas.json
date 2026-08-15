@@ -15,14 +15,6 @@
       "android": {
         "buildType": "apk"
       }
-    },
-    "production": {
-      "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_DEPLOYMENT_ENV": "production",
-        "EXPO_PUBLIC_API_URL": "https://learning-os.141.227.152.154.nip.io/api",
-        "EXPO_PUBLIC_ENGINE_URL": "https://learning-os.141.227.152.154.nip.io/api/mobile"
-      }
     }
   }
 }
