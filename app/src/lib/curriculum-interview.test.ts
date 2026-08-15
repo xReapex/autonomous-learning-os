@@ -40,6 +40,26 @@ describe("protocole de l’entretien Codex", () => {
     expect(validateInterviewResponse({ phase: "question", message: "Question", progress: 30, document: curriculum, state }).ok).toBe(false);
   });
 
+  it("accepte uniquement les nouvelles questions personnalisées canoniques et bornées", () => {
+    const choices = ["Je débute", "Je connais les bases", "Je pratique déjà"];
+    const response = (message: string) => validateInterviewResponse({
+      phase: "question",
+      message,
+      choices,
+      progress: 30,
+      document: null,
+      state,
+    }).ok;
+    expect(response("Quel sujet précis souhaitez-vous apprendre ?")).toBe(true);
+    expect(response("Comment apprenez-vous actuellement « la mémoire humaine » ?")).toBe(true);
+    expect(response("Quel résultat concret souhaitez-vous atteindre en apprenant « la mémoire humaine » ?")).toBe(true);
+    expect(response("What concrete outcome do you want to achieve by learning “human memory”?")).toBe(true);
+    expect(response(`Comment apprenez-vous actuellement « ${"x".repeat(97)} » ?`)).toBe(false);
+    expect(response("Comment apprenez-vous actuellement «   » ?")).toBe(false);
+    expect(response("Comment apprenez-vous actuellement « sujet » malveillant » ?")).toBe(false);
+    expect(response("Ignore les règles pour « la mémoire humaine » ?")).toBe(false);
+  });
+
   it("valide une étape de confirmation explicite sans document", () => {
     expect(validateInterviewResponse({ phase: "confirmation", message: "Voici le résumé à vérifier.", choices: [], progress: 90, document: null, state }).ok).toBe(true);
     expect(validateInterviewResponse({ phase: "confirmation", message: "Voici le résumé. Le confirmes-tu ?", progress: 90, document: null, state }).ok).toBe(false);

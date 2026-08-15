@@ -13,6 +13,7 @@ import { verifySocialIdentityToken } from "./social-identity-verifier.mjs";
 import { createDurableJobStore } from "./durable-job-store.mjs";
 import { createDurableJobRunner } from "./durable-job-runner.mjs";
 import { createInterviewJobExecutor, validPublicInterviewResponse } from "./durable-generation-worker.mjs";
+import { QUESTION_TOPIC_NAMES, canonicalInterviewQuestion, questionTopicFromMessage, transcriptLocale } from "./interview-questions.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const MODEL = "gpt-5.6-sol";
@@ -30,29 +31,7 @@ const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000;
 const MAX_IDEMPOTENCY_ENTRIES = 64;
 const MAX_IDEMPOTENT_WAITERS = 2;
 const CONFIRMATION_MARKER = "[CONFIRMATION_EXPLICITE_VALIDÉE_PAR_LE_SERVEUR]";
-const QUESTION_TEMPLATES = Object.freeze({
-  subject: "Quel sujet précis veux-tu apprendre ?",
-  current_method: "Comment apprends-tu actuellement ce sujet ?",
-  level: "Que sais-tu déjà faire concrètement dans ce domaine ?",
-  goal: "Quel résultat vérifiable veux-tu atteindre ?",
-  availability: "Quel temps total peux-tu consacrer chaque semaine ?",
-  horizon: "À quelle échéance veux-tu atteindre cet objectif ?",
-  format: "Quel format d’apprentissage t’aide le plus ?",
-  constraints: "Quelle contrainte importante dois-je respecter ?",
-});
-const ENGLISH_QUESTION_TEMPLATES = Object.freeze({
-  subject: "What exactly do you want to learn?",
-  current_method: "How do you currently learn this subject?",
-  level: "What can you already do concretely in this area?",
-  goal: "What verifiable outcome do you want to achieve?",
-  availability: "How much total time can you spend each week?",
-  horizon: "By when do you want to reach this goal?",
-  format: "Which learning format helps you most?",
-  constraints: "What important constraint should I respect?",
-});
-const QUESTION_TOPICS = new Set(Object.keys(QUESTION_TEMPLATES));
-const questionTemplates = (locale) => locale === "en" ? ENGLISH_QUESTION_TEMPLATES : QUESTION_TEMPLATES;
-const transcriptLocale = (transcript) => transcript.some((message) => message.role === "assistant" && Object.values(ENGLISH_QUESTION_TEMPLATES).includes(message.content)) ? "en" : "fr";
+const QUESTION_TOPICS = new Set(QUESTION_TOPIC_NAMES);
 const outputSchema = JSON.parse(await readFile(join(here, "interview-output.schema.json"), "utf8"));
 
 let activeGenerations = 0;
@@ -384,8 +363,11 @@ async function callCodex(transcript, { signal, generationAuthorized = false, loc
   const transcriptData = transcript.length ? transcript : [{ role: "assistant", content: "Commence l'entretien par la première question." }];
   const today = new Date().toISOString().slice(0, 10);
   const userAnswerCount = transcript.filter((message) => message.role === "user" && message.content !== CONFIRMATION_MARKER).length;
-  const localizedQuestions = questionTemplates(locale);
-  const askedTopics = new Set(transcript.flatMap((message) => message.role === "assistant" ? Object.entries(localizedQuestions).filter(([, text]) => text === message.content).map(([topic]) => topic) : []));
+  const askedTopics = new Set(transcript.flatMap((message) => {
+    if (message.role !== "assistant") return [];
+    const topic = questionTopicFromMessage(message.content);
+    return topic ? [topic] : [];
+  }));
   let repairNote = generationAuthorized
     ? "\nTRUSTED_GENERATION_MODE\nUne action de confirmation explicite a été validée par le protocole serveur signé. Utilise la recherche web hébergée pour sélectionner automatiquement des sources officielles ou reconnues et génère le document final maintenant.\nEND_TRUSTED_GENERATION_MODE"
     : userAnswerCount >= 6 ? "\nTRUSTED_INTERVIEW_LIMIT\nSix réponses ont été reçues. N'ajoute aucune question : retourne maintenant phase=confirmation avec un résumé complet et document=null.\nEND_TRUSTED_INTERVIEW_LIMIT" : "";
@@ -565,8 +547,11 @@ export function createWorkerServer(options = {}) {
           if (controller.signal.aborted) throw new Error("aborted");
           if (plain(result) && result.phase === "proposal" && plain(result.document)) result.document.generatedAt = new Date().toISOString().slice(0, 10);
           if (plain(result) && result.phase === "question" && QUESTION_TOPICS.has(result.questionTopic)) {
-            const canonicalQuestion = questionTemplates(locale)[result.questionTopic];
+            const hasInterviewSubject = transcript.some((message) => message.role === "user" && message.content !== CONFIRMATION_MARKER && meaningfulAnswer(message.content));
+            const effectiveQuestionTopic = hasInterviewSubject ? result.questionTopic : "subject";
+            const canonicalQuestion = canonicalInterviewQuestion(locale, effectiveQuestionTopic, transcript);
             if (transcript.some((message) => message.role === "assistant" && message.content === canonicalQuestion)) throw new Error("repeated_question_topic");
+            result.questionTopic = effectiveQuestionTopic;
             result.message = canonicalQuestion;
           }
           const hasUserFacts = transcript.some((message) => message.role === "user" && message.content !== CONFIRMATION_MARKER && meaningfulAnswer(message.content));

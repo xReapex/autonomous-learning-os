@@ -31,6 +31,7 @@ type Result<T> = { ok: true; value: T } | { ok: false };
 const plainObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const exactKeys = (value: Record<string, unknown>, keys: string[]) => Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const QUESTION_MESSAGES = new Set([
+  "Quel sujet précis souhaitez-vous apprendre ?",
   "Quel sujet précis veux-tu apprendre ?",
   "Comment apprends-tu actuellement ce sujet ?",
   "Que sais-tu déjà faire concrètement dans ce domaine ?",
@@ -48,6 +49,29 @@ const QUESTION_MESSAGES = new Set([
   "Which learning format helps you most?",
   "What important constraint should I respect?",
 ]);
+const PERSONALIZED_SUBJECT = String.raw`[^«»“”\p{Cc}\p{Cf}]{1,96}`;
+const PERSONALIZED_SUBJECT_CAPTURE = `(${PERSONALIZED_SUBJECT})`;
+const PERSONALIZED_QUESTION_PATTERNS = [
+  new RegExp(`^Comment apprenez-vous actuellement « ${PERSONALIZED_SUBJECT_CAPTURE} » \\?$`, "u"),
+  new RegExp(`^Que savez-vous déjà expliquer ou appliquer sur « ${PERSONALIZED_SUBJECT_CAPTURE} » \\?$`, "u"),
+  new RegExp(`^Quel résultat concret souhaitez-vous atteindre en apprenant « ${PERSONALIZED_SUBJECT_CAPTURE} » \\?$`, "u"),
+  new RegExp(`^Combien de temps pouvez-vous consacrer chaque semaine à « ${PERSONALIZED_SUBJECT_CAPTURE} » \\?$`, "u"),
+  new RegExp(`^Quand souhaitez-vous atteindre votre objectif autour de « ${PERSONALIZED_SUBJECT_CAPTURE} » \\?$`, "u"),
+  new RegExp(`^Quel format vous aiderait le plus à progresser sur « ${PERSONALIZED_SUBJECT_CAPTURE} » \\?$`, "u"),
+  new RegExp(`^Quelle contrainte dois-je respecter pour construire votre parcours sur « ${PERSONALIZED_SUBJECT_CAPTURE} » \\?$`, "u"),
+  new RegExp(`^How do you currently learn “${PERSONALIZED_SUBJECT_CAPTURE}”\\?$`, "u"),
+  new RegExp(`^What can you already explain or apply about “${PERSONALIZED_SUBJECT_CAPTURE}”\\?$`, "u"),
+  new RegExp(`^What concrete outcome do you want to achieve by learning “${PERSONALIZED_SUBJECT_CAPTURE}”\\?$`, "u"),
+  new RegExp(`^How much time can you spend each week on “${PERSONALIZED_SUBJECT_CAPTURE}”\\?$`, "u"),
+  new RegExp(`^By when do you want to reach your goal for “${PERSONALIZED_SUBJECT_CAPTURE}”\\?$`, "u"),
+  new RegExp(`^Which format would help you progress most with “${PERSONALIZED_SUBJECT_CAPTURE}”\\?$`, "u"),
+  new RegExp(`^What constraint should I respect when building your path for “${PERSONALIZED_SUBJECT_CAPTURE}”\\?$`, "u"),
+];
+const recognizedQuestionMessage = (value: string) => QUESTION_MESSAGES.has(value)
+  || PERSONALIZED_QUESTION_PATTERNS.some((pattern) => {
+    const match = pattern.exec(value);
+    return Boolean(match && meaningfulAnswer(match[1]));
+  });
 const CONFIRMATION_MARKER = "[CONFIRMATION_EXPLICITE_VALIDÉE_PAR_LE_SERVEUR]";
 const QUESTION_MARK_PATTERN = /[\u003F\u00BF\u037E\u055E\u061F\u0706\u07F9\u0839-\u083B\u1367\u1945\u1AA7\u203D\u2047-\u2049\u225F\u2370\u2753\u2754\u2A7B\u2A7C\u2CFA\u2CFB\u2E18\u2E2E\u2E54\u3244\uA60F\uA6F7\uFE16\uFE56\uFF1F\u{10A56}\u{110BE}\u{11143}\u{1144B}\u{1144C}\u{115C2}\u{115C3}\u{11641}\u{11FFF}\u{1E95F}\u{1F679}-\u{1F67B}\u{1FBC4}\u{E003F}]/u;
 const validDeclarativeSummary = (value: string) => {
@@ -78,7 +102,7 @@ export function validateInterviewResponse(value: unknown): Result<InterviewRespo
   if (!plainObject(value) || !exactKeys(value, ["phase", "message", "choices", "progress", "document", "state"]) || typeof value.message !== "string" || value.message.trim().length < 1 || value.message.length > MAX_INTERVIEW_MESSAGE_CHARS || !Array.isArray(value.choices) || typeof value.state !== "string" || value.state.length < 40 || value.state.length > MAX_INTERVIEW_STATE_CHARS || !Number.isInteger(value.progress) || (value.progress as number) < 0 || (value.progress as number) > 100) return { ok: false };
   const choices = value.choices.map((choice) => typeof choice === "string" ? normalizeAnswer(choice) : "");
   const choicesValid = choices.every((choice) => meaningfulAnswer(choice) && choice.length <= 160) && new Set(choices.map((choice) => choice.toLocaleLowerCase())).size === choices.length;
-  if (value.phase === "question" && choices.length >= 3 && choices.length <= 5 && choicesValid && QUESTION_MESSAGES.has(value.message) && value.document === null && (value.progress as number) < 100) return { ok: true, value: { ...value, choices } as InterviewResponse };
+  if (value.phase === "question" && choices.length >= 3 && choices.length <= 5 && choicesValid && recognizedQuestionMessage(value.message) && value.document === null && (value.progress as number) < 100) return { ok: true, value: { ...value, choices } as InterviewResponse };
   if (choices.length !== 0) return { ok: false };
   if (value.phase === "confirmation" && validDeclarativeSummary(value.message) && value.document === null && (value.progress as number) < 100) return { ok: true, value: value as InterviewResponse };
   if (value.phase === "proposal" && value.progress === 100 && validateCurriculumDocument(value.document).ok) return { ok: true, value: value as InterviewResponse };

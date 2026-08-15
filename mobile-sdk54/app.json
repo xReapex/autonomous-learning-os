@@ -7,7 +7,7 @@
       "ios",
       "android"
     ],
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/brand/icon-v5.png",
     "scheme": "scio",
     "userInterfaceStyle": "light",

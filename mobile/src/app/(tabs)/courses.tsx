@@ -131,14 +131,6 @@ export default function CoursesScreen() {
                 accessibilityLabel={t('a11y.progress', { value: percent })}
               />
             </View>
-            <Button
-              busy={mutationKey === 'curriculum:delete'}
-              disabled={mutationKey !== null}
-              icon="delete"
-              label={t('curriculum.remove')}
-              onPress={confirmRemoveSubject}
-              variant="danger"
-            />
 
             {message ? (
               <Pressable
@@ -264,6 +256,14 @@ export default function CoursesScreen() {
                 })}
               </View>
             ))}
+            <Button
+              busy={mutationKey === 'curriculum:delete'}
+              disabled={mutationKey !== null}
+              icon="delete"
+              label={t('curriculum.remove')}
+              onPress={confirmRemoveSubject}
+              variant="danger"
+            />
           </AppScreen>
         );
       }}

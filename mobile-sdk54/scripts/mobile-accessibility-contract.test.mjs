@@ -29,11 +29,15 @@ test('la navigation réserve sa hauteur et intègre la zone système', async () 
     source('components/course-generation-task-bar.tsx'),
   ]);
   assert.match(tabs, /useSafeAreaInsets\(\)/);
+  assert.match(tabs, /tabBarPosition:\s*fluid\.tablet\s*\?\s*'left'\s*:\s*'bottom'/);
+  assert.match(tabs, /tabBarShowLabel:\s*true/);
   assert.match(tabs, /height:\s*fluid\.tabBarHeight\s*\+\s*insets\.bottom/);
+  assert.match(tabs, /width:\s*fluid\.tabBarWidth/);
   assert.match(tabs, /paddingBottom:\s*insets\.bottom/);
   assert.doesNotMatch(tabs, /tabBarStyle:\s*\{[\s\S]*?position:\s*'absolute'/);
   assert.doesNotMatch(tabs, /tabBarStyle:\s*\{[\s\S]*?bottom:/);
-  assert.match(taskBar, /bottom:\s*insets\.bottom\s*\+\s*\(inTabs\s*\?\s*fluid\.tabBarHeight\s*:\s*0\)\s*\+\s*fluid\.gutter\s*\*\s*0\.6/);
+  assert.match(taskBar, /left:\s*fluid\.gutter\s*\+\s*\(inTabs\s*&&\s*fluid\.tablet\s*\?\s*fluid\.tabBarWidth\s*:\s*0\)/);
+  assert.match(taskBar, /bottom:\s*insets\.bottom\s*\+\s*\(inTabs\s*&&\s*!fluid\.tablet\s*\?\s*fluid\.tabBarHeight\s*:\s*0\)\s*\+\s*fluid\.gutter\s*\*\s*0\.6/);
 });
 
 test('les changements de réponse et de mutation sont annoncés', async () => {

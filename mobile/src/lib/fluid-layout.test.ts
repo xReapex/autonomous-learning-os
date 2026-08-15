@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { resolveFluidLayout } from './fluid-layout';
 
 describe('fluid mobile layout', () => {
+  it('classe la navigation par largeur de fenêtre, indépendamment de l’orientation', () => {
+    expect(resolveFluidLayout(720, 360, 1).tablet).toBe(true);
+    expect(resolveFluidLayout(360, 720, 1).tablet).toBe(false);
+  });
+
   it.each([
     [320, 568, 1],
     [360, 800, 1],

@@ -40,7 +40,11 @@ export function RewardToast() {
       pointerEvents="box-none"
       style={[
         styles.wrapper,
-        { top: insets.top + fluid.gutter * 0.4, left: fluid.gutter, right: fluid.gutter },
+        {
+          top: insets.top + fluid.gutter * 0.4,
+          left: fluid.gutter + (fluid.tablet ? fluid.tabBarWidth : 0),
+          right: fluid.gutter,
+        },
       ]}>
       <Animated.View entering={reducedMotion ? undefined : FadeInDown.duration(350)} exiting={reducedMotion ? undefined : FadeOutUp.duration(250)} style={styles.motion}>
         <Pressable

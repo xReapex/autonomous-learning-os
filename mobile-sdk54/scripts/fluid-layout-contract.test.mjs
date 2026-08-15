@@ -18,5 +18,7 @@ test('les surfaces refondues dérivent leur géométrie du viewport', async () =
   assert.doesNotMatch(home, /(?:width|height):\s*(?:38|44|52)/);
   assert.doesNotMatch(tabs, /height:\s*layout\.tabBarHeight/);
   assert.match(home, /aspectRatio:\s*1/);
-  assert.match(tabs, /tabBarShowLabel:\s*!fluid\.compact/);
+  assert.match(tabs, /tabBarShowLabel:\s*true/);
+  assert.match(tabs, /tabBarPosition:\s*fluid\.tablet\s*\?\s*'left'\s*:\s*'bottom'/);
+  assert.match(tabs, /width:\s*fluid\.tabBarWidth/);
 });

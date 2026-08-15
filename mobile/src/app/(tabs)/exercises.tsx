@@ -8,6 +8,7 @@ import {
   DataGate,
   Reveal,
   ScreenHeader,
+  StateScene,
   StatusBanner,
   Surface,
   textStyles,
@@ -44,32 +45,20 @@ export default function ExercisesScreen() {
         if (!exercise) {
           const complete = data.exercises.length > 0;
           return (
-            <AppScreen>
+            <AppScreen contentContainerStyle={styles.stateScreen}>
               <ScreenHeader
                 eyebrow={t('exercises.eyebrow')}
                 title={t('exercises.title')}
                 subtitle={t('exercises.subtitle')}
               />
-              <Surface style={styles.empty}>
-                <View
-                  style={[
-                    styles.emptyIcon,
-                    { width: fluid.controlSize * 1.15, aspectRatio: 1 },
-                    complete && styles.emptyIconComplete,
-                  ]}>
-                  <AppIcon
-                    name={complete ? 'check' : 'exercises'}
-                    size={26}
-                    color={complete ? palette.onPrimary : palette.primaryText}
-                  />
-                </View>
-                <Text style={styles.emptyTitle}>
-                  {t(complete ? 'exercises.complete' : 'exercises.empty')}
-                </Text>
-                <Text style={[textStyles.muted, styles.center]}>
-                  {t(complete ? 'exercises.completeBody' : 'exercises.emptyBody')}
-                </Text>
-              </Surface>
+              <StateScene
+                body={t(complete ? 'exercises.completeBody' : 'exercises.emptyBody')}
+                icon={complete ? 'check' : 'exercises'}
+                live
+                style={styles.empty}
+                title={t(complete ? 'exercises.complete' : 'exercises.empty')}
+                tone={complete ? 'success' : 'neutral'}
+              />
             </AppScreen>
           );
         }
@@ -254,15 +243,6 @@ const styles = StyleSheet.create({
   feedbackTry: { backgroundColor: palette.warningSoft, borderColor: palette.warningLine },
   feedbackCopy: { flex: 1, gap: spacing.xs },
   feedbackTitle: { color: palette.ink, fontFamily: typography.strong, lineHeight: 21 },
-  empty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  emptyIcon: {
-    borderRadius: radius.lg,
-    backgroundColor: palette.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  emptyIconComplete: { backgroundColor: palette.success },
-  emptyTitle: { color: palette.ink, fontFamily: typography.title, fontSize: 20, textAlign: 'center' },
-  center: { textAlign: 'center' },
+  stateScreen: { flexGrow: 1 },
+  empty: { flexGrow: 1, justifyContent: 'center' },
 });

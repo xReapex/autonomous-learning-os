@@ -76,9 +76,9 @@ export function CourseGenerationTaskBar() {
       style={[
         styles.dock,
         {
-          left: fluid.gutter,
+          left: fluid.gutter + (inTabs && fluid.tablet ? fluid.tabBarWidth : 0),
           right: fluid.gutter,
-          bottom: insets.bottom + (inTabs ? fluid.tabBarHeight : 0) + fluid.gutter * 0.6,
+          bottom: insets.bottom + (inTabs && !fluid.tablet ? fluid.tabBarHeight : 0) + fluid.gutter * 0.6,
         },
       ]}>
       {progress ? (

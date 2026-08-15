@@ -37,7 +37,10 @@ import { ScioMark } from './scio-mark';
 
 type IconName = AppIconName;
 
-export function AppScreen({ children }: { children: ReactNode }) {
+export function AppScreen({ children, contentContainerStyle }: {
+  children: ReactNode;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+}) {
   const { overlayInset } = useOverlayInset();
   const fluid = useFluidLayout();
   return (
@@ -53,6 +56,7 @@ export function AppScreen({ children }: { children: ReactNode }) {
             paddingBottom: fluid.sectionGap + overlayInset,
             gap: fluid.sectionGap,
           },
+          contentContainerStyle,
         ]}
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
@@ -141,6 +145,86 @@ export function Surface({
 }) {
   const fluid = useFluidLayout();
   return <View style={[styles.surface, { padding: fluid.cardPadding }, style]}>{children}</View>;
+}
+
+export function StateScene({
+  actionIcon,
+  actionLabel,
+  alert = false,
+  body,
+  icon,
+  live = false,
+  onAction,
+  style,
+  title,
+  tone = 'neutral',
+}: {
+  actionIcon?: IconName;
+  actionLabel?: string;
+  alert?: boolean;
+  body: string;
+  icon: IconName;
+  live?: boolean;
+  onAction?: () => void;
+  style?: StyleProp<ViewStyle>;
+  title: string;
+  tone?: 'danger' | 'editorial' | 'neutral' | 'success';
+}) {
+  const fluid = useFluidLayout();
+  const condensed = fluid.largeText && fluid.shortViewport;
+  const danger = tone === 'danger';
+  const editorial = tone === 'editorial';
+  const success = tone === 'success';
+  return (
+    <Surface
+      style={[
+        styles.stateScene,
+        condensed && styles.stateSceneCondensed,
+        editorial && styles.stateSceneEditorial,
+        style,
+      ]}>
+      {!condensed ? (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            styles.stateSceneIcon,
+            { width: fluid.controlSize * 1.2, aspectRatio: 1 },
+            editorial && styles.stateSceneIconEditorial,
+            danger && styles.stateSceneIconDanger,
+            success && styles.stateSceneIconSuccess,
+          ]}>
+          <AppIcon
+            name={icon}
+            size={fluid.controlSize * 0.56}
+            color={success ? palette.onPrimary : danger ? palette.danger : palette.primaryText}
+          />
+        </View>
+      ) : null}
+      <View
+        accessibilityLiveRegion={alert ? 'assertive' : live ? 'polite' : undefined}
+        accessibilityRole={alert ? 'alert' : undefined}
+        style={styles.stateSceneCopy}>
+        <Text
+          accessibilityRole="header"
+          style={[styles.stateSceneTitle, editorial && styles.stateSceneTitleEditorial]}>
+          {title}
+        </Text>
+        <Text style={[styles.stateSceneBody, editorial && styles.stateSceneBodyEditorial]}>
+          {body}
+        </Text>
+      </View>
+      {actionLabel && onAction ? (
+        <Button
+          label={actionLabel}
+          icon={actionIcon}
+          onPress={onAction}
+          style={styles.stateSceneAction}
+          variant={editorial ? 'contrast' : 'primary'}
+        />
+      ) : null}
+    </Surface>
+  );
 }
 
 export function BentoGrid({
@@ -373,7 +457,7 @@ export function DataGate({
 
   if (status === 'loading' && !data) {
     return (
-      <AppScreen>
+      <AppScreen contentContainerStyle={styles.stateScreen}>
         <View style={styles.stateContainer}>
           <BrandLoader caption={t('common.loading')} />
         </View>
@@ -383,17 +467,20 @@ export function DataGate({
 
   if (status === 'empty') {
     return (
-      <AppScreen>
-        <View style={styles.stateContainer}>
-          <View style={[styles.stateIcon, styles.emptyStateIcon, { width: fluid.controlSize * 1.2, aspectRatio: 1 }]}>
-            <AppIcon name="route" size={fluid.controlSize * 0.58} color={palette.primaryText} />
-          </View>
-          <Text style={styles.stateTitle}>{t('curriculum.emptyTitle')}</Text>
-          <Text style={styles.stateBody}>{t('curriculum.emptyBody')}</Text>
-          <Button
-            label={t('curriculum.create')}
-            icon="arrow-right"
-            onPress={() => router.push('/create-course' as Href)}
+      <AppScreen contentContainerStyle={styles.stateScreen}>
+        <View
+          style={[
+            styles.stateContainer,
+            fluid.largeText && fluid.shortViewport && styles.stateContainerShort,
+          ]}>
+          <StateScene
+            actionIcon="arrow-right"
+            actionLabel={t('curriculum.create')}
+            body={t('curriculum.emptyBody')}
+            icon="route"
+            onAction={() => router.push('/create-course' as Href)}
+            title={t('curriculum.emptyTitle')}
+            tone="editorial"
           />
         </View>
       </AppScreen>
@@ -402,14 +489,18 @@ export function DataGate({
 
   if (!data) {
     return (
-      <AppScreen>
-        <View style={styles.stateContainer} accessibilityRole="alert">
-          <View style={[styles.stateIcon, { width: fluid.controlSize * 1.2, aspectRatio: 1 }]}>
-            <AppIcon name="cloud-alert" size={fluid.controlSize * 0.58} color={palette.danger} />
-          </View>
-          <Text style={styles.stateTitle}>{t('status.error.title')}</Text>
-          <Text style={styles.stateBody}>{t(errorKey ?? 'status.error.body')}</Text>
-          <Button label={t('common.retry')} icon="refresh" onPress={() => void retry()} />
+      <AppScreen contentContainerStyle={styles.stateScreen}>
+        <View style={styles.stateContainer}>
+          <StateScene
+            actionIcon="refresh"
+            actionLabel={t('common.retry')}
+            alert
+            body={t(errorKey ?? 'status.error.body')}
+            icon="cloud-alert"
+            onAction={() => void retry()}
+            title={t('status.error.title')}
+            tone="danger"
+          />
         </View>
       </AppScreen>
     );
@@ -578,31 +669,53 @@ const styles = StyleSheet.create({
   },
   bannerTitle: { color: palette.ink, fontFamily: typography.strong, fontSize: 14 },
   bannerBody: { color: palette.muted, fontFamily: typography.body, fontSize: 13, lineHeight: 19 },
+  stateScreen: { flexGrow: 1 },
   stateContainer: {
-    flexGrow: 1,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
+  },
+  stateContainerShort: { justifyContent: 'flex-start' },
+
+  stateScene: {
+    width: '100%',
+    maxWidth: 560,
+    alignItems: 'center',
     gap: spacing.lg,
+    alignSelf: 'center',
   },
-  stateIcon: {
+  stateSceneCondensed: { gap: spacing.md, paddingVertical: spacing.md },
+  stateSceneEditorial: {
+    backgroundColor: palette.ink,
+    borderColor: palette.inkSoft,
+    ...elevation.floating,
+  },
+  stateSceneIcon: {
     borderRadius: radius.lg,
-    backgroundColor: palette.dangerSoft,
+    backgroundColor: palette.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyStateIcon: { backgroundColor: palette.primarySoft },
-  stateTitle: {
+  stateSceneIconEditorial: { backgroundColor: palette.primarySoft },
+  stateSceneIconDanger: { backgroundColor: palette.dangerSoft },
+  stateSceneIconSuccess: { backgroundColor: palette.success },
+  stateSceneCopy: { width: '100%', alignItems: 'center', gap: spacing.sm },
+  stateSceneTitle: {
     color: palette.ink,
-    fontFamily: typography.title,
-    fontSize: 24,
+    fontFamily: typography.display,
+    fontSize: 26,
+    lineHeight: 32,
     textAlign: 'center',
   },
-  stateBody: {
+  stateSceneTitleEditorial: { color: palette.paper },
+  stateSceneBody: {
+    maxWidth: 430,
     color: palette.muted,
     fontFamily: typography.body,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 24,
     textAlign: 'center',
   },
+  stateSceneBodyEditorial: { color: palette.surfaceDeep },
+  stateSceneAction: { alignSelf: 'stretch' },
 });

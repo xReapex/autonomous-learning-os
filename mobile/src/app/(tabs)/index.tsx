@@ -125,22 +125,18 @@ export default function HomeScreen() {
                   router.push('/create-course' as Href);
                 }}
                 style={({ pressed }) => [
-                  styles.createBlock,
-                  { gap: fluid.sectionGap, padding: fluid.cardPadding },
+                  styles.createRow,
+                  { minHeight: fluid.controlSize, padding: fluid.cardPadding },
                   pressed && styles.pressed,
                 ]}>
-                <View style={styles.createTopline}>
-                  <Text style={styles.createIndex}>NEW PATH</Text>
-                  <View style={[styles.createArrow, { width: fluid.controlSize, aspectRatio: 1 }]}>
-                    <AppIcon color={palette.white} name="arrow-right" size={fluid.controlSize * 0.42} />
-                  </View>
+                <View style={[styles.createIcon, { width: fluid.controlSize * 0.86, aspectRatio: 1 }]}>
+                  <AppIcon color={palette.primaryText} name="route" size={fluid.controlSize * 0.4} />
                 </View>
                 <View style={styles.createCopy}>
-                  <Text style={[styles.createTitle, { fontSize: fluid.titleSize * 0.72, lineHeight: fluid.titleLineHeight * 0.72 }]}>
-                    {t('home.createCourse')}
-                  </Text>
+                  <Text style={styles.createTitle}>{t('home.createCourse')}</Text>
                   <Text style={styles.createHint}>{t('home.createCourseHint')}</Text>
                 </View>
+                <AppIcon color={palette.muted} name="chevron-right" size={21} />
               </Pressable>
             </Reveal>
 
@@ -227,22 +223,24 @@ const styles = StyleSheet.create({
   metricRuleCompact: { width: '100%', height: 1 },
   metricValue: { color: palette.ink, fontFamily: typography.display, fontSize: 25, letterSpacing: -0.5 },
   metricLabel: { color: palette.muted, fontFamily: typography.medium, fontSize: 11, lineHeight: 15, textAlign: 'center' },
-  createBlock: {
-    justifyContent: 'space-between',
-    borderRadius: radius.xl,
-    backgroundColor: palette.primary,
+  createRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: palette.surfaceDeep,
+    backgroundColor: palette.paper,
   },
-  createTopline: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  createIndex: { color: palette.primarySoft, fontFamily: typography.bold, fontSize: 10, letterSpacing: 1.35 },
-  createArrow: {
-    borderRadius: radius.pill,
+  createIcon: {
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: palette.primaryDark,
+    backgroundColor: palette.primarySoft,
   },
-  createCopy: { gap: spacing.sm },
-  createTitle: { color: palette.white, fontFamily: typography.display, letterSpacing: -0.55 },
-  createHint: { color: palette.primarySoft, fontFamily: typography.body, fontSize: 14, lineHeight: 21 },
+  createCopy: { flex: 1, minWidth: 0, gap: spacing.xs },
+  createTitle: { color: palette.ink, fontFamily: typography.title, fontSize: 17, lineHeight: 22 },
+  createHint: { color: palette.muted, fontFamily: typography.body, fontSize: 13, lineHeight: 19 },
   weekSection: { gap: spacing.md },
   weekSheet: {
     borderRadius: radius.lg,

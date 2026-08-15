@@ -54,7 +54,7 @@ describe("protocole privé du worker", () => {
     expect(firstBody.choices).toEqual(question.choices);
     const second = await post(port, JSON.stringify({ state: firstBody.state, answer: "I want to learn TypeScript." }));
     expect(second.status).toBe(200);
-    expect(JSON.parse(second.body).message).toBe("What verifiable outcome do you want to achieve?");
+    expect(JSON.parse(second.body).message).toBe("What concrete outcome do you want to achieve by learning “I want to learn TypeScript.”?");
     expect(generate.mock.calls[0][1]?.locale).toBe("en");
     expect(generate.mock.calls[1][1]?.locale).toBe("en");
   });
@@ -172,7 +172,7 @@ describe("protocole privé du worker", () => {
     const state = JSON.parse(first.body).state as string; expect(state.length).toBeGreaterThan(40);
     expect((await post(port, JSON.stringify({ state: `${state}x`, answer: "ma réponse" }))).status).toBe(400);
     const second = await post(port, JSON.stringify({ state, answer: "ma réponse" })); expect(second.status).toBe(200);
-    expect(generate.mock.calls[1][0]).toEqual([{ role: "assistant", content: "Quel résultat vérifiable veux-tu atteindre ?" }, { role: "user", content: "ma réponse" }]);
+    expect(generate.mock.calls[1][0]).toEqual([{ role: "assistant", content: "Quel sujet précis souhaitez-vous apprendre ?" }, { role: "user", content: "ma réponse" }]);
   });
 
   it("n’autorise la génération et la recherche qu’après une action confirm signée", async () => {
@@ -312,11 +312,11 @@ describe("protocole privé du worker", () => {
     expect(JSON.parse(proposal.body).document.generatedAt).toBe(new Date().toISOString().slice(0, 10));
   });
 
-  it("remplace tout texte composé par l’unique question du sujet déclaré", async () => {
+  it("force d’abord la question du sujet quand le modèle tente de sauter cette étape", async () => {
     const generate = vi.fn().mockResolvedValue({ phase: "question", questionTopic: "availability", message: "Décris ton objectif. Combien de minutes peux-tu étudier ?", choices: question.choices, progress: 10, document: null });
     const port = await start(generate); const response = await post(port, "{}");
     expect(response.status).toBe(200);
-    expect(JSON.parse(response.body).message).toBe("Quel temps total peux-tu consacrer chaque semaine ?");
+    expect(JSON.parse(response.body).message).toBe("Quel sujet précis souhaitez-vous apprendre ?");
   });
 
   it("refuse une confirmation avant toute réponse utilisateur", async () => {

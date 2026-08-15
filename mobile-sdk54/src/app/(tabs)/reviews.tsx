@@ -8,8 +8,8 @@ import {
   DataGate,
   Reveal,
   ScreenHeader,
+  StateScene,
   StatusBanner,
-  Surface,
   textStyles,
 } from '@/components/ui';
 import { layout, palette, radius, spacing, typography } from '@/constants/theme';
@@ -101,7 +101,7 @@ export default function ReviewsScreen() {
         };
 
         return (
-          <AppScreen>
+          <AppScreen contentContainerStyle={styles.stateScreen}>
             <ScreenHeader
               eyebrow={t('reviews.eyebrow')}
               title={t('reviews.title')}
@@ -186,17 +186,14 @@ export default function ReviewsScreen() {
                 ) : null}
               </>
             ) : (
-              <Surface style={styles.complete}>
-                <View style={[styles.completeIcon, { width: fluid.controlSize * 1.2, aspectRatio: 1 }]}>
-                  <AppIcon name="check" size={fluid.controlSize * 0.58} color={palette.onPrimary} />
-                </View>
-                <Text style={styles.completeTitle}>
-                  {t(emptyState === 'no_cards' ? 'reviews.empty' : 'reviews.complete')}
-                </Text>
-                <Text style={[textStyles.muted, styles.center]}>
-                  {t(emptyState === 'no_cards' ? 'reviews.emptyBody' : 'reviews.completeBody')}
-                </Text>
-              </Surface>
+              <StateScene
+                body={t(emptyState === 'no_cards' ? 'reviews.emptyBody' : 'reviews.completeBody')}
+                icon={emptyState === 'no_cards' ? 'reviews' : 'check'}
+                live
+                style={styles.complete}
+                title={t(emptyState === 'no_cards' ? 'reviews.empty' : 'reviews.complete')}
+                tone={emptyState === 'no_cards' ? 'neutral' : 'success'}
+              />
             )}
           </AppScreen>
         );
@@ -236,18 +233,6 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'column', gap: spacing.md },
   action: { width: '100%' },
   pressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
-  complete: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
-  completeIcon: {
-    borderRadius: radius.pill,
-    backgroundColor: palette.success,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  completeTitle: {
-    color: palette.ink,
-    fontFamily: typography.title,
-    fontSize: 24,
-    textAlign: 'center',
-  },
-  center: { textAlign: 'center' },
+  stateScreen: { flexGrow: 1 },
+  complete: { flexGrow: 1, justifyContent: 'center' },
 });
