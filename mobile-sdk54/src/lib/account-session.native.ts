@@ -6,7 +6,7 @@ import { legacyTechnicalSessionKey } from './secure-store-keys';
 
 export function clearLocalSessionDataOnDevice(): Promise<void> {
   return clearLocalSessionData({
-    clearSession: () => SecureStore.deleteItemAsync(legacyTechnicalSessionKey).catch(() => undefined),
+    clearSession: () => SecureStore.deleteItemAsync(legacyTechnicalSessionKey),
     removeStorage: async (keys) => {
       await AsyncStorage.multiRemove([...keys]);
     },

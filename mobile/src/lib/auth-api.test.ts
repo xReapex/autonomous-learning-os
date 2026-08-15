@@ -63,7 +63,7 @@ describe('client SCIO Auth API', () => {
     );
   });
 
-  it('efface un jeton refusé par le serveur', async () => {
+  it('signale un jeton refusé sans effet destructif avant coordination', async () => {
     const storage = tokenStorage(issuedPayload.token);
     const api = createAuthApi({
       baseUrl: 'https://learning.scio.app/api',
@@ -71,8 +71,60 @@ describe('client SCIO Auth API', () => {
       tokenStorage: storage,
     });
 
-    await expect(api.restore()).resolves.toBeNull();
-    expect(storage.value()).toBeNull();
+    await expect(api.restore()).rejects.toThrow('auth_session_expired');
+    expect(storage.value()).toBe(issuedPayload.token);
+  });
+
+  it('conserve le jeton si la restauration serveur échoue sans invalider la session', async () => {
+    const storage = tokenStorage(issuedPayload.token);
+    const api = createAuthApi({
+      baseUrl: 'https://learning.scio.app/api',
+      fetchImpl: vi.fn(async () => Response.json({ error: { code: 'auth_unavailable' } }, { status: 503 })),
+      tokenStorage: storage,
+    });
+
+    await expect(api.restore()).rejects.toThrow('auth_restore_failed');
+    expect(storage.value()).toBe(issuedPayload.token);
+  });
+
+  it('borne une restauration suspendue sans effacer le jeton', async () => {
+    vi.useFakeTimers();
+    const storage = tokenStorage(issuedPayload.token);
+    const api = createAuthApi({
+      baseUrl: 'https://learning.scio.app/api',
+      fetchImpl: vi.fn((_url, init) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      })),
+      restoreTimeoutMs: 50,
+      tokenStorage: storage,
+    });
+
+    const timeoutResult = expect(api.restore()).rejects.toThrow('auth_restore_timeout');
+    await vi.advanceTimersByTimeAsync(50);
+    await timeoutResult;
+    expect(storage.value()).toBe(issuedPayload.token);
+    vi.useRealTimers();
+  });
+
+  it('borne aussi une lecture SecureStore suspendue avant le fetch', async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn();
+    const api = createAuthApi({
+      baseUrl: 'https://learning.scio.app/api',
+      fetchImpl,
+      restoreTimeoutMs: 50,
+      tokenStorage: {
+        get: () => new Promise<string | null>(() => {}),
+        set: async () => undefined,
+        clear: async () => undefined,
+      },
+    });
+
+    const timeoutResult = expect(api.restore()).rejects.toThrow('auth_restore_timeout');
+    await vi.advanceTimersByTimeAsync(50);
+    await timeoutResult;
+    expect(fetchImpl).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('révoque la session serveur avant d’effacer le jeton local', async () => {

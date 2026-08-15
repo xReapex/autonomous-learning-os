@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import { settleSessionCleanup } from './account-session-core';
 import { createAuthApi } from './auth-api';
 import type { AuthProvider } from './auth-policy';
 import type { AuthSession } from './auth-session-core';
@@ -35,10 +36,7 @@ export async function readAuthSession(provider: AuthProvider): Promise<AuthSessi
   if (provider === 'unavailable') return null;
   const session = await apiClient().restore();
   if (!session) return null;
-  if (session.user.provider !== provider) {
-    await apiClient().clearLocalToken();
-    return null;
-  }
+  if (session.user.provider !== provider) throw new Error('auth_session_expired');
   return session;
 }
 
@@ -85,8 +83,8 @@ export function deleteServerAccount(reauthenticationProof?: string): Promise<voi
 }
 
 export async function clearAuthSession(): Promise<void> {
-  await Promise.allSettled([
-    SecureStore.deleteItemAsync(authAccessTokenKey),
-    SecureStore.deleteItemAsync(authSessionStorageKey),
+  await settleSessionCleanup([
+    () => SecureStore.deleteItemAsync(authAccessTokenKey),
+    () => SecureStore.deleteItemAsync(authSessionStorageKey),
   ]);
 }

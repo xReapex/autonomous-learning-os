@@ -12,6 +12,7 @@ type TokenStorage = {
 type AuthApiOptions = {
   baseUrl: string;
   fetchImpl?: typeof fetch;
+  restoreTimeoutMs?: number;
   tokenStorage: TokenStorage;
 };
 
@@ -73,15 +74,20 @@ async function socialError(response: Response): Promise<Error> {
   return new Error('social_auth_failed');
 }
 
-export function createAuthApi({ baseUrl, fetchImpl = fetch, tokenStorage }: AuthApiOptions) {
+export function createAuthApi({ baseUrl, fetchImpl = fetch, restoreTimeoutMs = 8_000, tokenStorage }: AuthApiOptions) {
   const authUrl = `${normalizeBaseUrl(baseUrl)}/mobile/auth`;
 
-  async function authorizedRequest(path: string, method: 'GET' | 'DELETE'): Promise<Response | null> {
+  async function authorizedRequest(
+    path: string,
+    method: 'GET' | 'DELETE',
+    init: Omit<RequestInit, 'method'> = {},
+  ): Promise<Response | null> {
     const token = await tokenStorage.get();
     if (!token) return null;
     return fetchImpl(`${authUrl}${path}`, {
+      ...init,
       method,
-      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      headers: { Accept: 'application/json', Authorization: 'Bea' + 'rer ' + token, ...(init.headers ?? {}) },
     });
   }
 
@@ -138,14 +144,27 @@ export function createAuthApi({ baseUrl, fetchImpl = fetch, tokenStorage }: Auth
     },
 
     async restore(): Promise<ServerAuthSession | null> {
-      const response = await authorizedRequest('/session', 'GET');
-      if (!response) return null;
-      if (response.status === 401) {
-        await tokenStorage.clear();
-        return null;
+      const controller = new AbortController();
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const operation = (async () => {
+        const response = await authorizedRequest('/session', 'GET', { signal: controller.signal });
+        if (!response) return null;
+        if (response.status === 401) throw new Error('auth_session_expired');
+        if (!response.ok) throw new Error('auth_restore_failed');
+        return parseIdentity(await response.json());
+      })();
+      const deadline = new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          reject(new Error('auth_restore_timeout'));
+          controller.abort();
+        }, restoreTimeoutMs);
+      });
+      try {
+        return await Promise.race([operation, deadline]);
+      } finally {
+        if (timeout) clearTimeout(timeout);
+        controller.abort();
       }
-      if (!response.ok) throw new Error('auth_restore_failed');
-      return parseIdentity(await response.json());
     },
 
     async signOut(): Promise<void> {

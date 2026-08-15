@@ -10,11 +10,18 @@ export type ClearLocalSessionDependencies = {
   removeStorage: (keys: readonly string[]) => Promise<void>;
 };
 
+export async function settleSessionCleanup(operations: (() => Promise<void>)[]): Promise<void> {
+  const results = await Promise.allSettled(operations.map((operation) => Promise.resolve().then(operation)));
+  if (results.some((result) => result.status === 'rejected')) {
+    throw new Error('auth_local_cleanup_failed');
+  }
+}
+
 export async function clearLocalSessionData(
   dependencies: ClearLocalSessionDependencies,
 ): Promise<void> {
-  await Promise.all([
-    dependencies.clearSession(),
-    dependencies.removeStorage(localSessionDataKeys),
+  await settleSessionCleanup([
+    dependencies.clearSession,
+    () => dependencies.removeStorage(localSessionDataKeys),
   ]);
 }

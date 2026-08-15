@@ -1,10 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { clearLocalSessionDataOnDevice } from '@/lib/account-session.native';
+import { settleSessionCleanup } from '@/lib/account-session-core';
 import { finalizeConfirmedAccountAction } from '@/lib/account-action';
 import { resolveAuthProvider, type AuthProvider as AuthProviderKind } from '@/lib/auth-policy';
 import type { AuthSession, AuthUser } from '@/lib/auth-session-core';
+import { authStatusAfterRestoreError } from '@/lib/auth-restore-state';
 import {
   clearAuthSession,
   createAndStoreDevelopmentSession,
@@ -12,20 +14,26 @@ import {
   readAuthSession,
   revokeAuthSession,
 } from '@/lib/auth-session-store';
-import { subscribeSessionExpired } from '@/lib/session-expiration';
+import {
+  expiredSessionCleanupCoordinator,
+  observeExpiredSessionCleanup,
+} from '@/lib/expired-session-cleanup';
+import { emitSessionExpired, subscribeSessionExpired } from '@/lib/session-expiration';
 
-type AuthStatus = 'checking' | 'signed-out' | 'signed-in';
+type AuthStatus = 'checking' | 'expired' | 'restore-error' | 'signed-out' | 'signed-in';
 
 type AuthContextValue = {
   provider: AuthProviderKind;
   status: AuthStatus;
   user: AuthUser | null;
   signInDevelopment: () => Promise<void>;
+  retrySessionRestore: () => Promise<void>;
   signOut: () => Promise<void>;
   deleteDevelopmentProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const cleanupObservationMs = 6_000;
 
 function activeProvider(): AuthProviderKind {
   const platform = Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : 'web';
@@ -39,44 +47,111 @@ function activeProvider(): AuthProviderKind {
   });
 }
 
+async function clearExpiredSessionData(): Promise<void> {
+  await settleSessionCleanup([clearAuthSession, clearLocalSessionDataOnDevice]);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const provider = activeProvider();
   const [status, setStatus] = useState<AuthStatus>('checking');
   const [session, setSession] = useState<AuthSession | null>(null);
+  const restoreGeneration = useRef(0);
+
+  const settleExpiredCleanup = useCallback(async (generation: number) => {
+    const cleanup = expiredSessionCleanupCoordinator.ensure(clearExpiredSessionData);
+    const observed = await observeExpiredSessionCleanup(cleanup, cleanupObservationMs);
+    if (generation !== restoreGeneration.current) return;
+    setSession(null);
+    setStatus(observed === 'cleared' && !expiredSessionCleanupCoordinator.isRequired() ? 'expired' : 'restore-error');
+
+    if (observed === 'pending') {
+      void cleanup.then((result) => {
+        if (generation !== restoreGeneration.current) return;
+        setSession(null);
+        setStatus(result === 'cleared' && !expiredSessionCleanupCoordinator.isRequired() ? 'expired' : 'restore-error');
+      });
+    }
+  }, []);
+
+  const handleRestoreFailure = useCallback(async (error: unknown, generation: number) => {
+    if (generation !== restoreGeneration.current) return;
+    setSession(null);
+    if (authStatusAfterRestoreError(error) !== 'expired') {
+      setStatus('restore-error');
+      return;
+    }
+    expiredSessionCleanupCoordinator.require();
+    setStatus('checking');
+    await settleExpiredCleanup(generation);
+  }, [settleExpiredCleanup]);
+
+  const retrySessionRestore = useCallback(async () => {
+    const generation = ++restoreGeneration.current;
+    setSession(null);
+    setStatus('checking');
+    if (expiredSessionCleanupCoordinator.isRequired()) {
+      await settleExpiredCleanup(generation);
+      return;
+    }
+    try {
+      const stored = await readAuthSession(provider);
+      if (generation !== restoreGeneration.current) return;
+      setSession(stored);
+      setStatus(stored ? 'signed-in' : 'signed-out');
+    } catch (error) {
+      await handleRestoreFailure(error, generation);
+    }
+  }, [handleRestoreFailure, provider, settleExpiredCleanup]);
 
   useEffect(() => {
-    let active = true;
-    void readAuthSession(provider)
-      .then((stored) => {
-        if (!active) return;
-        setSession(stored);
-        setStatus(stored ? 'signed-in' : 'signed-out');
-      })
-      .catch(() => {
-        if (!active) return;
-        setSession(null);
-        setStatus('signed-out');
-      });
+    const generation = ++restoreGeneration.current;
+    if (expiredSessionCleanupCoordinator.isRequired()) {
+      void settleExpiredCleanup(generation);
+    } else {
+      void readAuthSession(provider)
+        .then((stored) => {
+          if (generation !== restoreGeneration.current) return;
+          setSession(stored);
+          setStatus(stored ? 'signed-in' : 'signed-out');
+        })
+        .catch((error: unknown) => {
+          void handleRestoreFailure(error, generation);
+        });
+    }
     return () => {
-      active = false;
+      restoreGeneration.current += 1;
     };
-  }, [provider]);
+  }, [handleRestoreFailure, provider, settleExpiredCleanup]);
 
   useEffect(() => subscribeSessionExpired(() => {
-    void Promise.all([clearAuthSession(), clearLocalSessionDataOnDevice()]).finally(() => {
-      setSession(null);
-      setStatus('signed-out');
-    });
-  }), []);
+    const generation = ++restoreGeneration.current;
+    expiredSessionCleanupCoordinator.require();
+    setSession(null);
+    setStatus('checking');
+    void settleExpiredCleanup(generation);
+  }), [settleExpiredCleanup]);
+
+  const discardObsoleteSignIn = useCallback(async () => {
+    expiredSessionCleanupCoordinator.require();
+    emitSessionExpired();
+    await expiredSessionCleanupCoordinator.ensure(clearExpiredSessionData);
+    throw new Error('auth_operation_obsolete');
+  }, []);
 
   const signInDevelopment = useCallback(async () => {
     if (provider !== 'development') throw new Error('development_auth_unavailable');
+    if (expiredSessionCleanupCoordinator.isRequired()) throw new Error('auth_cleanup_pending');
+    const generation = ++restoreGeneration.current;
     const nextSession = await createAndStoreDevelopmentSession();
+    if (generation !== restoreGeneration.current || expiredSessionCleanupCoordinator.isRequired()) {
+      await discardObsoleteSignIn();
+    }
     setSession(nextSession);
     setStatus('signed-in');
-  }, [provider]);
+  }, [discardObsoleteSignIn, provider]);
 
   const signOut = useCallback(async () => {
+    restoreGeneration.current += 1;
     await finalizeConfirmedAccountAction({
       remoteAction: revokeAuthSession,
       localCleanup: [clearAuthSession, clearLocalSessionDataOnDevice],
@@ -86,6 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteDevelopmentProfile = useCallback(async () => {
+    restoreGeneration.current += 1;
     await finalizeConfirmedAccountAction({
       remoteAction: deleteServerAccount,
       localCleanup: [clearAuthSession, clearLocalSessionDataOnDevice],
@@ -98,12 +174,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       deleteDevelopmentProfile,
       provider,
+      retrySessionRestore,
       signInDevelopment,
       signOut,
       status,
       user: session?.user ?? null,
     }),
-    [deleteDevelopmentProfile, provider, session, signInDevelopment, signOut, status],
+    [deleteDevelopmentProfile, provider, retrySessionRestore, session, signInDevelopment, signOut, status],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

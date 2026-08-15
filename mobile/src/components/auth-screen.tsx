@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandLoader } from '@/components/brand-loader';
@@ -7,15 +7,29 @@ import { ScioMark } from '@/components/scio-mark';
 import { Button, Reveal } from '@/components/ui';
 import { elevation, palette, radius, spacing, typography } from '@/constants/theme';
 import { useFluidLayout } from '@/lib/use-fluid-layout';
+import { openPublicScioPage, type PublicScioPage } from '@/lib/public-links';
 import { useAuth } from '@/providers/auth-provider';
 import { useLocale } from '@/providers/locale-provider';
 
 export function AuthScreen() {
-  const { provider, signInDevelopment, signInSocial, status } = useAuth();
+  const { provider, retrySessionRestore, signInDevelopment, signInSocial, status } = useAuth();
   const { t } = useLocale();
   const fluid = useFluidLayout();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [legalLinkFailed, setLegalLinkFailed] = useState(false);
+  const restoreFailed = status === 'restore-error';
+  const expired = status === 'expired';
+  const titleKey = restoreFailed
+    ? 'auth.restoreFailedTitle'
+    : provider === 'unavailable'
+      ? 'auth.unavailableTitle'
+      : 'auth.title';
+  const bodyKey = restoreFailed
+    ? 'auth.restoreFailedBody'
+    : provider === 'unavailable'
+      ? 'auth.unavailableBody'
+      : 'auth.body';
 
   const connectDevelopmentProfile = async () => {
     setBusy(true);
@@ -41,6 +55,12 @@ export function AuthScreen() {
     }
   };
 
+  const openLegalPage = async (page: PublicScioPage) => {
+    setLegalLinkFailed(false);
+    const result = await openPublicScioPage(page, Linking.openURL);
+    setLegalLinkFailed(result === 'failed');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -64,11 +84,11 @@ export function AuthScreen() {
 
           <Reveal delay={60} style={styles.editorial}>
             <Text style={styles.index}>01 — {t('auth.tagline')}</Text>
-            <Text style={[styles.statement, { fontSize: fluid.titleSize * 1.14, lineHeight: fluid.titleLineHeight * 1.14 }]}>
-              {t(provider === 'unavailable' ? 'auth.unavailableTitle' : 'auth.title')}
+            <Text accessibilityRole="header" style={[styles.statement, { fontSize: fluid.titleSize * 1.14, lineHeight: fluid.titleLineHeight * 1.14 }]}>
+              {t(titleKey)}
             </Text>
             <Text style={styles.introduction}>
-              {t(provider === 'unavailable' ? 'auth.unavailableBody' : 'auth.body')}
+              {t(bodyKey)}
             </Text>
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.rule}>
               <View style={styles.ruleFill} />
@@ -88,7 +108,20 @@ export function AuthScreen() {
                 ) : null}
               </View>
 
-              {provider === 'development' ? (
+              {restoreFailed ? (
+                <Button
+                  label={t('auth.retry')}
+                  onPress={() => void retrySessionRestore()}
+                />
+              ) : null}
+
+              {!restoreFailed && expired ? (
+                <Text accessibilityLiveRegion="polite" style={styles.statusNotice}>
+                  {t('auth.expiredBody')}
+                </Text>
+              ) : null}
+
+              {!restoreFailed && provider === 'development' ? (
                 <>
                   <Button
                     busy={busy}
@@ -101,7 +134,7 @@ export function AuthScreen() {
                 </>
               ) : null}
 
-              {provider === 'google' || provider === 'apple' ? (
+              {!restoreFailed && (provider === 'google' || provider === 'apple') ? (
                 <Button
                   busy={busy}
                   disabled={busy}
@@ -111,9 +144,29 @@ export function AuthScreen() {
                 />
               ) : null}
 
-              {failed ? (
+              {!restoreFailed && failed ? (
                 <Text accessibilityRole="alert" style={styles.error}>
-                  {t('auth.error')}
+                  {t(provider === 'development' ? 'auth.errorDevelopment' : 'auth.errorSocial')}
+                </Text>
+              ) : null}
+
+              <View style={styles.legalLinks}>
+                <Pressable
+                  accessibilityRole="link"
+                  onPress={() => void openLegalPage('privacy')}
+                  style={styles.legalLink}>
+                  <Text style={styles.legalText}>{t('auth.privacy')}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="link"
+                  onPress={() => void openLegalPage('terms')}
+                  style={styles.legalLink}>
+                  <Text style={styles.legalText}>{t('auth.terms')}</Text>
+                </Pressable>
+              </View>
+              {legalLinkFailed ? (
+                <Text accessibilityRole="alert" style={styles.error}>
+                  {t('auth.legalLinkError')}
                 </Text>
               ) : null}
             </Reveal>
@@ -196,5 +249,17 @@ const styles = StyleSheet.create({
     backgroundColor: palette.primaryMist,
   },
   note: { color: palette.faint, fontFamily: typography.body, fontSize: 12, lineHeight: 18 },
+  statusNotice: {
+    color: palette.primaryText,
+    fontFamily: typography.body,
+    fontSize: 14,
+    lineHeight: 21,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: palette.primaryMist,
+  },
   error: { color: palette.danger, fontFamily: typography.body, fontSize: 14, lineHeight: 20 },
+  legalLinks: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm },
+  legalLink: { minHeight: 48, justifyContent: 'center', paddingHorizontal: spacing.md },
+  legalText: { color: palette.primaryText, fontFamily: typography.medium, fontSize: 13, textDecorationLine: 'underline' },
 });

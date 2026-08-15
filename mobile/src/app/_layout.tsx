@@ -85,7 +85,7 @@ function AuthBoundary() {
   }, [ready]);
 
   if (!ready) return <Loading />;
-  if (decision === 'fallback' || status === 'signed-out') {
+  if (decision === 'fallback' || status !== 'signed-in') {
     return (
       <>
         <StatusBar style="dark" />
