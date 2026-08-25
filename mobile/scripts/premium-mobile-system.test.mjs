@@ -5,6 +5,16 @@ import test from 'node:test';
 const source = (path) => readFile(new URL(`../src/${path}`, import.meta.url), 'utf8');
 const manifest = () => readFile(new URL('../app.json', import.meta.url), 'utf8');
 
+const styleBlock = (sourceText, name) => {
+  const marker = `  ${name}: {`;
+  const start = sourceText.indexOf(marker);
+  assert.notEqual(start, -1, `style ${name} absent`);
+  const bodyStart = start + marker.length;
+  const end = sourceText.indexOf('\n  },', bodyStart);
+  assert.notEqual(end, -1, `style ${name} non borné`);
+  return sourceText.slice(bodyStart, end);
+};
+
 test('les états sans contenu partagent une scène éditoriale accessible', async () => {
   const [ui, exercises, reviews] = await Promise.all([
     source('components/ui.tsx'),
@@ -69,6 +79,32 @@ test('la navigation adapte la barre basse en rail sans masquer les libellés par
   assert.match(await source('components/ui.tsx'), /const condensed = fluid\.largeText && fluid\.shortViewport/);
   assert.match(await source('components/ui.tsx'), /!condensed \? \(/);
   assert.match(await source('components/ui.tsx'), /condensed && styles\.stateSceneCondensed/);
+});
+
+test('l’accès SCIO utilise une composition éditoriale visible plutôt qu’une carte flottante générique', async () => {
+  const [auth, i18n] = await Promise.all([
+    source('components/auth-screen.tsx'),
+    source('lib/i18n.ts'),
+  ]);
+
+  const heroPanel = styleBlock(auth, 'heroPanel');
+  const accessPanel = styleBlock(auth, 'accessPanel');
+  const largeTopline = styleBlock(auth, 'sheetToplineLargeText');
+
+  assert.match(auth, /styles\.heroPanel/);
+  assert.match(auth, /styles\.editorialSpine/);
+  assert.match(auth, /styles\.accessPanel/);
+  assert.match(auth, /!fluid\.compact \? \(/);
+  assert.match(auth, /fluid\.compact && styles\.sheetToplineLargeText/);
+  assert.match(auth, /t\('auth\.accessEyebrow'\)/);
+  assert.match(i18n, /'auth\.accessEyebrow':\s*'ACCÈS'/);
+  assert.match(i18n, /'auth\.accessEyebrow':\s*'ACCESS'/);
+  assert.match(heroPanel, /backgroundColor:\s*palette\.ink/);
+  assert.doesNotMatch(heroPanel, /overflow:\s*'hidden'/);
+  assert.match(accessPanel, /borderLeftWidth:\s*4/);
+  assert.match(largeTopline, /flexDirection:\s*'column'/);
+  assert.match(largeTopline, /alignItems:\s*'flex-start'/);
+  assert.doesNotMatch(auth, /styles\.actionSheet/);
 });
 
 test('le manifeste autorise les fenêtres et orientations adaptatives sur tablette', async () => {

@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandLoader } from '@/components/brand-loader';
 import { ScioMark } from '@/components/scio-mark';
 import { Button, Reveal } from '@/components/ui';
-import { elevation, palette, radius, spacing, typography } from '@/constants/theme';
+import { palette, radius, spacing, typography } from '@/constants/theme';
 import { openPublicScioPage, type PublicScioPage } from '@/lib/public-links';
 import { useFluidLayout } from '@/lib/use-fluid-layout';
 import { useAuth } from '@/providers/auth-provider';
@@ -63,23 +63,39 @@ export function AuthScreen() {
               gap: fluid.sectionGap,
             },
           ]}>
-          <Reveal style={styles.brandBar}>
-            <View style={[styles.markFrame, { width: fluid.controlSize, aspectRatio: 1 }]}>
-              <ScioMark size={fluid.controlSize * 0.8} monochrome />
+          <Reveal style={[styles.heroPanel, { padding: fluid.cardPadding }]}>
+            <View style={styles.brandBar}>
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={[styles.markFrame, { width: fluid.controlSize, aspectRatio: 1 }]}>
+                <ScioMark size={fluid.controlSize * 0.8} monochrome />
+              </View>
+              <Text style={styles.wordmark}>SCIO</Text>
             </View>
-            <Text style={styles.wordmark}>SCIO</Text>
-          </Reveal>
 
-          <Reveal delay={60} style={styles.editorial}>
-            <Text style={styles.index}>01 — {t('auth.tagline')}</Text>
-            <Text accessibilityRole="header" style={[styles.statement, { fontSize: fluid.titleSize * 1.14, lineHeight: fluid.titleLineHeight * 1.14 }]}>
-              {t(titleKey)}
-            </Text>
-            <Text style={styles.introduction}>
-              {t(bodyKey)}
-            </Text>
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.rule}>
-              <View style={styles.ruleFill} />
+            <View style={styles.heroBody}>
+              {!fluid.compact ? (
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={styles.editorialSpine}>
+                  <Text style={styles.spineIndex}>01</Text>
+                  <View style={styles.spineRule} />
+                </View>
+              ) : null}
+              <View style={styles.editorial}>
+                <Text style={styles.index}>{t('auth.tagline')}</Text>
+                <Text
+                  accessibilityRole="header"
+                  style={[
+                    styles.statement,
+                    { fontSize: fluid.titleSize * 1.14, lineHeight: fluid.titleLineHeight * 1.14 },
+                  ]}>
+                  {t(titleKey)}
+                </Text>
+                <Text style={styles.introduction}>{t(bodyKey)}</Text>
+              </View>
             </View>
           </Reveal>
 
@@ -88,9 +104,9 @@ export function AuthScreen() {
               <BrandLoader caption={t('auth.checking')} />
             </View>
           ) : (
-            <Reveal delay={120} style={[styles.actionSheet, { padding: fluid.cardPadding }]}>
-              <View style={styles.sheetTopline}>
-                <Text style={styles.sheetIndex}>ACCESS</Text>
+            <Reveal delay={120} style={[styles.accessPanel, { padding: fluid.cardPadding }]}>
+              <View style={[styles.sheetTopline, fluid.compact && styles.sheetToplineLargeText]}>
+                <Text accessibilityRole="header" style={styles.sheetIndex}>{t('auth.accessEyebrow')}</Text>
                 {provider === 'development' ? (
                   <Text style={styles.previewBadge}>{t('auth.developmentEyebrow')}</Text>
                 ) : null}
@@ -161,6 +177,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: 'space-between',
   },
+  heroPanel: {
+    gap: spacing.xxl,
+    backgroundColor: palette.ink,
+    borderTopRightRadius: radius.xl,
+    borderBottomLeftRadius: radius.xl,
+  },
   brandBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -170,49 +192,78 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: palette.paper,
+    backgroundColor: palette.paperWarm,
     borderWidth: 1,
-    borderColor: palette.surfaceDeep,
+    borderColor: palette.primaryLight,
   },
   wordmark: {
-    color: palette.ink,
+    color: palette.paper,
     fontFamily: typography.brand,
     fontSize: 19,
     letterSpacing: 4.8,
   },
-  editorial: { flex: 1, justifyContent: 'center', gap: spacing.lg, paddingVertical: spacing.xxl },
+  heroBody: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.lg,
+  },
+  editorialSpine: {
+    width: 28,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  spineIndex: {
+    color: palette.primarySoft,
+    fontFamily: typography.mono,
+    fontSize: 11,
+    letterSpacing: 0.8,
+  },
+  spineRule: {
+    flex: 1,
+    width: 2,
+    minHeight: 48,
+    backgroundColor: palette.primaryLight,
+  },
+  editorial: { flex: 1, minWidth: 0, gap: spacing.lg, paddingBottom: spacing.sm },
   index: {
-    color: palette.primaryText,
+    color: palette.primarySoft,
     fontFamily: typography.bold,
     fontSize: 10,
     letterSpacing: 1.35,
     textTransform: 'uppercase',
   },
   statement: {
-    color: palette.ink,
+    flexShrink: 1,
+    color: palette.paper,
     fontFamily: typography.display,
     letterSpacing: -1.45,
   },
   introduction: {
-    color: palette.muted,
+    color: palette.surfaceDeep,
     fontFamily: typography.body,
     fontSize: 17,
     lineHeight: 26,
   },
-  rule: { width: '100%', height: 4, marginTop: spacing.sm, backgroundColor: palette.surfaceDeep },
-  ruleFill: { width: '28%', height: '100%', backgroundColor: palette.primary },
   loading: { flex: 1, justifyContent: 'center' },
-  actionSheet: {
+  accessPanel: {
     gap: spacing.lg,
-    borderRadius: radius.xl,
     backgroundColor: palette.paper,
-    borderWidth: 1,
-    borderColor: palette.surfaceDeep,
-    ...elevation.soft,
+    borderLeftWidth: 4,
+    borderLeftColor: palette.primary,
+    borderTopWidth: 1,
+    borderTopColor: palette.surfaceDeep,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.surfaceDeep,
   },
   sheetTopline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  sheetToplineLargeText: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
   sheetIndex: { color: palette.faint, fontFamily: typography.bold, fontSize: 10, letterSpacing: 1.4 },
   previewBadge: {
+    flexShrink: 1,
+    alignSelf: 'flex-start',
     color: palette.primaryText,
     fontFamily: typography.bold,
     fontSize: 10,
